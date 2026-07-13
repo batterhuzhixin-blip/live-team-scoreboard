@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>现场统分系统｜大屏</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body data-page="rank" class="screen-body">
+    <header class="topbar screen-topbar">
+      <div class="brand">
+        <strong>现场统分系统</strong>
+        <span>大屏</span>
+      </div>
+      <nav class="nav-actions" aria-label="页面导航">
+        <a class="nav-link" href="/score-a.html">A路线计分台</a>
+        <a class="nav-link" href="/score-b.html">B路线计分台</a>
+        <span class="connection" id="connectionStatus">连接中</span>
+      </nav>
+    </header>
+
+    <main class="rank-page">
+      <section class="scoreboard-head">
+        <div>
+          <p class="eyebrow">实时同步</p>
+          <h1>比赛成绩大屏</h1>
+        </div>
+        <div class="screen-head-side">
+          <div class="summary-strip" id="rankSummary"></div>
+          <span id="lastUpdated" class="last-updated">--</span>
+        </div>
+      </section>
+
+      <section class="podium-band" id="podium"></section>
+
+      <section class="screen-board">
+        <div class="section-title">
+          <h2>全部队伍</h2>
+          <span id="screenTeamCount">--</span>
+        </div>
+        <div class="scoreboard-grid" id="scoreboardGrid"></div>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>现场统分系统｜B路线计分台</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body data-page="score" data-score-route="B" data-score-title="B路线计分台">
+    <header class="topbar">
+      <div class="brand">
+        <strong>现场统分系统</strong>
+        <span>B路线计分台</span>
+      </div>
+      <nav class="nav-actions" aria-label="页面导航">
+        <a class="nav-link" href="/score-a.html">A路线计分台</a>
+        <a class="nav-link" href="/rank.html">大屏</a>
+        <span class="connection" id="connectionStatus">连接中</span>
+      </nav>
+    </header>
+
+    <main class="score-page">
+      <section class="operator-panel">
+        <div class="operator-row">
+          <label class="field small-field">
+            <span>记录人</span>
+            <input id="staffName" type="text" autocomplete="name" placeholder="姓名" />
+          </label>
+          <div class="utility-actions">
+            <button type="button" class="ghost-btn" id="exportBtn">导出</button>
+            <button type="button" class="danger-ghost-btn" id="resetBtn">清空</button>
+          </div>
+        </div>
+
+        <form class="team-form" id="teamForm">
+          <label class="field team-name-field">
+            <span>队伍名称</span>
+            <input name="name" type="text" required placeholder="输入队伍名称" />
+          </label>
+          <label class="field">
+            <span>序号</span>
+            <input name="order" type="number" min="1" inputmode="numeric" placeholder="可选" />
+          </label>
+          <button type="submit" class="primary-btn">添加队伍</button>
+        </form>
+      </section>
+
+      <section class="score-workspace">
+        <div class="teams-column">
+          <div class="section-title">
+            <h2>队伍计分</h2>
+            <span id="teamCountText">--</span>
+          </div>
+          <div class="teams-list" id="teamsList"></div>
+        </div>
+
+        <aside class="rank-side">
+          <div class="section-title">
+            <h2>实时排名</h2>
+          </div>
+          <div id="scoreRankList" class="mini-rank-list"></div>
+        </aside>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="/app.js"></script>
+  </body>
+</html>

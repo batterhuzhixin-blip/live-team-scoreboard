@@ -1,0 +1,12 @@
+node_modules/
+npm-debug.log*
+server.log
+server.err.log
+.env
+.DS_Store
+*.docx
+
+# Local runtime data. Keep it out of source control unless you intentionally
+# want to ship a preset scoreboard state.
+data/state.json
+data/*.broken-*

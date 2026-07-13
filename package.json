@@ -1,0 +1,14 @@
+{
+  "name": "live-team-scoreboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Open live team scoreboard and big-screen ranking website",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
