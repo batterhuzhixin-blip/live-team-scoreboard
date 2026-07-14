@@ -64,19 +64,32 @@ function connectEvents() {
   closeEvents();
 
   if (!window.EventSource) {
-    setConnection(false);
-    pollTimer = setInterval(fetchState, 3000);
+    startPolling();
     return;
   }
 
   eventsConnection = new EventSource("/api/events");
   eventsConnection.addEventListener("open", () => setConnection(true));
-  eventsConnection.addEventListener("error", () => setConnection(false));
+  eventsConnection.addEventListener("error", () => {
+    setConnection(false);
+    if (eventsConnection) {
+      eventsConnection.close();
+      eventsConnection = null;
+    }
+    startPolling();
+  });
   eventsConnection.addEventListener("state", (event) => {
     currentState = JSON.parse(event.data);
     setConnection(true);
     scheduleRender();
   });
+}
+
+function startPolling() {
+  if (pollTimer) return;
+  setConnection(false);
+  fetchState();
+  pollTimer = setInterval(fetchState, 3000);
 }
 
 function closeEvents() {
