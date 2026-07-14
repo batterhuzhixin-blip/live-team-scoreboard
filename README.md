@@ -8,6 +8,8 @@
 
 点击上面的按钮后，Render 会读取仓库里的 `render.yaml` 创建 Web Service。部署完成后会生成一个公开 HTTPS 地址。
 
+如果 Render 要求信用卡验证，可以查看 [无信用卡部署方案](NO_CARD_DEPLOYMENT.md)。
+
 ## 页面地址
 
 - 大屏：`/rank.html`
