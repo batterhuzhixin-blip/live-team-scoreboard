@@ -1,6 +1,12 @@
 # 现场统分网站
 
-一个开放访问的比赛统分网站，包含 A 路线计分台、B 路线计分台和成绩大屏。
+开放访问的比赛统分网站，包含 A 路线计分台、B 路线计分台和成绩大屏。
+
+## 一键部署
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/batterhuzhixin-blip/live-team-scoreboard)
+
+点击上面的按钮后，Render 会读取仓库里的 `render.yaml` 创建 Web Service。部署完成后会生成一个公开 HTTPS 地址。
 
 ## 页面地址
 
@@ -33,24 +39,18 @@ http://192.168.1.11:3000/rank.html
 - `HOST`：监听地址，默认 `0.0.0.0`
 - `DATA_DIR`：数据目录，默认项目内的 `data`
 
-生产环境建议把 `DATA_DIR` 指向持久化磁盘，否则云平台重启后可能丢失分数数据。
+## 免费部署提醒
+
+当前 `render.yaml` 使用 Render 免费 Web Service，方便快速获得公网网址。
+
+免费服务的本地文件系统不是持久化存储。分数数据写入 `DATA_DIR/state.json`，如果服务重启、休眠恢复或重新部署，线上分数可能丢失。
+
+正式比赛建议升级为以下方案之一：
+
+- Render 付费 Web Service + Persistent Disk，并设置 `DATA_DIR=/var/data`
+- 云数据库存储分数
+- 自己的云服务器，并定期备份 `data/state.json`
 
 ## 开放访问说明
 
-当前版本不设置登录和密码，任何拿到网址的人都可以进入计分台录入或修改分数。适合现场内控使用；如果要公开发到更大范围，建议后续增加计分台密码，只让大屏公开。
-
-## 部署建议
-
-可以部署到支持 Node.js 的平台，例如云服务器、Railway、Render 或公司内网服务器。
-
-启动命令：
-
-```bash
-npm start
-```
-
-健康检查路径：
-
-```text
-/api/health
-```
+当前版本不设置登录和密码。任何拿到网址的人都可以进入计分台录入或修改分数。适合现场内控使用；如果要公开发到更大范围，建议后续增加计分台密码，只让大屏公开。
