@@ -2,7 +2,7 @@ services:
   - type: web
     name: live-team-scoreboard
     runtime: node
-    plan: starter
+    plan: free
     region: singapore
     buildCommand: npm install
     startCommand: npm start
@@ -10,9 +10,3 @@ services:
     envVars:
       - key: HOST
         value: 0.0.0.0
-      - key: DATA_DIR
-        value: /var/data
-    disk:
-      name: scoreboard-data
-      mountPath: /var/data
-      sizeGB: 1
