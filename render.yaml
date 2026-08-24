@@ -4,9 +4,34 @@ services:
     runtime: node
     plan: free
     region: singapore
-    buildCommand: npm install
-    startCommand: npm start
+    buildCommand: npm ci
+    startCommand: node server.js
     healthCheckPath: /api/health
     envVars:
       - key: HOST
         value: 0.0.0.0
+      - key: SCORE_A_PASSWORD
+        sync: false
+      - key: SCORE_B_PASSWORD
+        sync: false
+      - key: SCORE_AUTH_SECRET
+        generateValue: true
+      - key: QUIZ_SERVICE_HOSTPORT
+        fromService:
+          type: web
+          name: finance-quiz-library
+          property: hostport
+
+  - type: web
+    name: finance-quiz-library
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm ci
+    startCommand: node quiz-server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: ADMIN_PASSWORD
+        sync: false

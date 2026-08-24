@@ -1,12 +1,22 @@
 {
-  "name": "live-team-scoreboard",
+  "name": "finance-competition-suite",
   "version": "1.0.0",
   "private": true,
-  "description": "Open live team scoreboard and big-screen ranking website",
-  "main": "server.js",
+  "description": "Online finance quiz library and synchronized live scoreboard",
+  "main": "start-all.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "node start-all.js",
+    "start:all": "node start-all.js",
+    "start:quiz": "node quiz-server.js",
+    "start:scoreboard": "node server.js",
+    "dev": "node start-all.js",
+    "check": "node --check start-all.js && node --check quiz-server.js && node --check server.js && node --check public/quiz.js && node --check public/admin.js && node --check public/app.js && node --check public/score-login.js",
+    "test:admin-users": "node tests/admin-users.integration.js",
+    "test:score-sync": "node tests/scoreboard-quiz-sync.integration.js",
+    "test": "npm run check && npm run test:admin-users && npm run test:score-sync"
+  },
+  "dependencies": {
+    "fflate": "^0.8.2"
   },
   "engines": {
     "node": ">=18"

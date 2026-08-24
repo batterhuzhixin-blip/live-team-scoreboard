@@ -10,7 +10,20 @@ const ROOT = __dirname;
 const PUBLIC_DIR = path.join(ROOT, "public");
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(ROOT, "data"));
 const STATE_FILE = path.join(DATA_DIR, "state.json");
-const FINISH_SCORE_TEAM_COUNT = 9;
+const FINISH_BONUSES = [5, 4, 3, 2];
+const FINISH_SCORE_TEAM_COUNT = FINISH_BONUSES.length;
+const QUIZ_SERVICE_HOSTPORT = String(process.env.QUIZ_SERVICE_HOSTPORT || "").trim();
+const QUIZ_TEAMS_URL = String(
+  process.env.QUIZ_TEAMS_URL ||
+  (QUIZ_SERVICE_HOSTPORT ? `http://${QUIZ_SERVICE_HOSTPORT}/api/integrations/scoreboard/teams` : "")
+).trim();
+const QUIZ_SYNC_INTERVAL_MS = Math.max(Number(process.env.QUIZ_SYNC_INTERVAL_MS || 15000), 250);
+const SCORE_PASSWORDS = {
+  A: String(process.env.SCORE_A_PASSWORD || ""),
+  B: String(process.env.SCORE_B_PASSWORD || "")
+};
+const SCORE_AUTH_SECRET = String(process.env.SCORE_AUTH_SECRET || crypto.randomBytes(32).toString("hex"));
+const SCORE_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 
 const TEAM_COLORS = ["#2563eb", "#16a34a", "#f59e0b", "#dc2626", "#7c3aed", "#0891b2", "#db2777", "#475569"];
 
@@ -33,7 +46,10 @@ const defaultState = () => ({
 });
 
 let state = loadState();
-const sseClients = new Set();
+const sseClients = new Map();
+let quizSyncTimer = null;
+let quizSyncRunning = false;
+let quizSyncStatus = { enabled: Boolean(QUIZ_TEAMS_URL), lastSuccessAt: null, lastError: null };
 
 function loadState() {
   ensureDataDir();
@@ -91,6 +107,8 @@ function normalizeTeam(team) {
   return {
     id,
     name,
+    quizTeamId: String(team.quizTeamId || "").trim(),
+    source: team.source === "quiz" || team.quizTeamId ? "quiz" : "manual",
     route: normalizeScoreRoute(team.route || team.scoreRoute || inferTeamRoute(scoreEvents)) || "A",
     order: toNullableNumber(team.order ?? team.drawOrder),
     color: normalizeColor(team.color) || pickColor(id),
@@ -100,6 +118,85 @@ function normalizeTeam(team) {
     createdAt: team.createdAt || new Date().toISOString(),
     updatedAt: team.updatedAt || latestEventTime(scoreEvents, finishedAt) || new Date().toISOString()
   };
+}
+
+function syncedTeamId(quizTeamId) {
+  return `quiz_${crypto.createHash("sha256").update(String(quizTeamId)).digest("hex").slice(0, 20)}`;
+}
+
+function normalizeSyncedTeam(team) {
+  const quizTeamId = String(team?.id || "").trim();
+  const name = String(team?.name || "").trim();
+  const route = normalizeScoreRoute(team?.route);
+  if (!quizTeamId || !name || !route) return null;
+  return { quizTeamId, name, route, registeredAt: normalizeDate(team.registeredAt) };
+}
+
+async function syncQuizTeams() {
+  if (!QUIZ_TEAMS_URL || quizSyncRunning) return;
+  quizSyncRunning = true;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+
+  try {
+    const response = await fetch(QUIZ_TEAMS_URL, { headers: { Accept: "application/json" }, signal: controller.signal });
+    if (!response.ok) throw new Error(`题库同步接口返回 ${response.status}`);
+    const payload = await response.json();
+    const incoming = (Array.isArray(payload.teams) ? payload.teams : []).map(normalizeSyncedTeam).filter(Boolean);
+    const incomingQuizTeamIds = new Set(incoming.map((team) => team.quizTeamId));
+    let changed = false;
+
+    for (const item of incoming) {
+      let team = state.teams.find((candidate) => candidate.quizTeamId === item.quizTeamId);
+      if (!team) {
+        const nameKey = item.name.toLocaleLowerCase("zh-CN");
+        team = state.teams.find((candidate) => candidate.name.toLocaleLowerCase("zh-CN") === nameKey);
+      }
+
+      if (team) {
+        if (team.name !== item.name || team.route !== item.route || team.quizTeamId !== item.quizTeamId || team.source !== "quiz") {
+          team.name = item.name;
+          team.route = item.route;
+          team.quizTeamId = item.quizTeamId;
+          team.source = "quiz";
+          team.updatedAt = new Date().toISOString();
+          changed = true;
+        }
+        continue;
+      }
+
+      state.teams.push(normalizeTeam({
+        id: syncedTeamId(item.quizTeamId),
+        quizTeamId: item.quizTeamId,
+        source: "quiz",
+        name: item.name,
+        route: item.route,
+        scoreEvents: [],
+        createdAt: item.registeredAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }));
+      changed = true;
+    }
+
+    const staleQuizTeamIds = new Set(
+      state.teams
+        .filter((team) => team.source === "quiz" && team.quizTeamId && !incomingQuizTeamIds.has(team.quizTeamId))
+        .map((team) => team.id)
+    );
+    if (staleQuizTeamIds.size) {
+      state.teams = state.teams.filter((team) => !staleQuizTeamIds.has(team.id));
+      changed = true;
+    }
+
+    if (changed) commit((draft) => draft.teams.sort(compareTeamDisplay));
+    quizSyncStatus = { enabled: true, lastSuccessAt: new Date().toISOString(), lastError: null };
+  } catch (error) {
+    quizSyncStatus = { enabled: true, lastSuccessAt: quizSyncStatus.lastSuccessAt, lastError: error.name === "AbortError" ? "题库同步超时" : error.message };
+    console.warn(`题库队伍同步失败：${quizSyncStatus.lastError}`);
+  } finally {
+    clearTimeout(timeout);
+    quizSyncRunning = false;
+  }
 }
 
 function getScoreEvents(team) {
@@ -192,7 +289,7 @@ function getPublicState() {
         team.id,
         {
           finishOrder: index + 1,
-          finishScore: Math.max(FINISH_SCORE_TEAM_COUNT - index, 0)
+          finishScore: FINISH_BONUSES[index] || 0
         }
       ])
   );
@@ -205,6 +302,7 @@ function getPublicState() {
     const totalScore = baseScore + finishScore;
     const positiveCount = scoreEvents.filter((event) => event.points > 0).length;
     const questionCounts = {
+      0: scoreEvents.filter((event) => event.points === 0).length,
       1: scoreEvents.filter((event) => event.points === 1).length,
       2: scoreEvents.filter((event) => event.points === 2).length,
       3: scoreEvents.filter((event) => event.points === 3).length
@@ -259,10 +357,10 @@ function getPublicState() {
   };
 }
 
-function filterPublicStateByRoute(publicState, route) {
+function getRouteState(route) {
+  const publicState = getPublicState();
   const teams = publicState.teams.filter((team) => team.route === route);
   const ranked = publicState.ranked.filter((team) => team.route === route);
-
   return {
     ...publicState,
     totals: {
@@ -358,21 +456,24 @@ function compareFinish(a, b) {
 }
 
 function broadcastState() {
-  const payload = JSON.stringify(getPublicState());
-  for (const client of sseClients) {
+  const payloads = new Map([["all", JSON.stringify(getPublicState())]]);
+  for (const [client, route] of sseClients) {
     try {
-      client.write(`event: state\ndata: ${payload}\n\n`);
+      const key = route || "all";
+      if (!payloads.has(key)) payloads.set(key, JSON.stringify(getRouteState(route)));
+      client.write(`event: state\ndata: ${payloads.get(key)}\n\n`);
     } catch (error) {
       sseClients.delete(client);
     }
   }
 }
 
-function sendJson(res, status, data) {
+function sendJson(res, status, data, extraHeaders = {}) {
   const body = JSON.stringify(data);
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
-    "Content-Length": Buffer.byteLength(body)
+    "Content-Length": Buffer.byteLength(body),
+    ...extraHeaders
   });
   res.end(body);
 }
@@ -397,6 +498,86 @@ async function readJsonBody(req) {
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
 
+function parseCookies(req) {
+  return String(req.headers.cookie || "")
+    .split(";")
+    .reduce((cookies, entry) => {
+      const separator = entry.indexOf("=");
+      if (separator < 1) return cookies;
+      cookies[entry.slice(0, separator).trim()] = decodeURIComponent(entry.slice(separator + 1).trim());
+      return cookies;
+    }, {});
+}
+
+function scoreSessionCookieName() {
+  // A browser can only hold one active scoring-desk identity at a time.
+  // Signing into the other route overwrites this cookie and invalidates the
+  // previous route for that browser.
+  return "score_active_session";
+}
+
+function signatureFor(value) {
+  return crypto.createHmac("sha256", SCORE_AUTH_SECRET).update(value).digest("base64url");
+}
+
+function safeEqual(left, right) {
+  const leftBuffer = Buffer.from(String(left));
+  const rightBuffer = Buffer.from(String(right));
+  return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function createScoreSession(route) {
+  const payload = Buffer.from(
+    JSON.stringify({ route, expiresAt: Date.now() + SCORE_SESSION_TTL_MS, nonce: crypto.randomUUID() })
+  ).toString("base64url");
+  return `${payload}.${signatureFor(payload)}`;
+}
+
+function scoreSession(req, route) {
+  const token = parseCookies(req)[scoreSessionCookieName(route)];
+  if (!token) return null;
+  const [payload, signature] = token.split(".");
+  if (!payload || !signature || !safeEqual(signature, signatureFor(payload))) return null;
+
+  try {
+    const data = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+    return data.route === route && Number(data.expiresAt) > Date.now() ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+function isSecureRequest(req) {
+  return String(req.headers["x-forwarded-proto"] || "").split(",")[0].trim() === "https";
+}
+
+function scoreSessionSetCookie(req, route) {
+  const attributes = [
+    `${scoreSessionCookieName(route)}=${createScoreSession(route)}`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    `Max-Age=${Math.floor(SCORE_SESSION_TTL_MS / 1000)}`
+  ];
+  if (isSecureRequest(req)) attributes.push("Secure");
+  return attributes.join("; ");
+}
+
+function hasScoreAccess(req, route) {
+  return Boolean(scoreSession(req, route));
+}
+
+function requireScoreAccess(req, res, route) {
+  if (hasScoreAccess(req, route)) return true;
+  sendError(res, 401, `请先登录${route}路线计分台`);
+  return false;
+}
+
+function sendRedirect(res, location) {
+  res.writeHead(302, { Location: location, "Cache-Control": "no-store" });
+  res.end();
+}
+
 function findTeam(id) {
   return state.teams.find((team) => team.id === id);
 }
@@ -407,25 +588,46 @@ async function handleApi(req, res, url) {
       ok: true,
       revision: Number(state.revision || 0),
       updatedAt: state.updatedAt,
-      uptime: Math.round(process.uptime())
+      uptime: Math.round(process.uptime()),
+      quizSync: quizSyncStatus
     });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/score-auth/login") {
+    const body = await readJsonBody(req);
+    const route = normalizeScoreRoute(body.route);
+    const password = String(body.password || "");
+    if (!route || !SCORE_PASSWORDS[route]) {
+      return sendError(res, 400, "计分台口令尚未配置");
+    }
+    if (!safeEqual(password, SCORE_PASSWORDS[route])) {
+      return sendError(res, 401, "登录口令不正确");
+    }
+    return sendJson(res, 200, { ok: true, route }, { "Set-Cookie": scoreSessionSetCookie(req, route) });
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/score-auth/me") {
+    const route = normalizeScoreRoute(url.searchParams.get("route"));
+    if (!route) return sendError(res, 400, "请选择A或B路线");
+    return sendJson(res, 200, { authenticated: hasScoreAccess(req, route), route });
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/score-state") {
+    const route = normalizeScoreRoute(url.searchParams.get("route"));
+    if (!route) return sendError(res, 400, "请选择A或B路线");
+    if (!requireScoreAccess(req, res, route)) return;
+    return sendJson(res, 200, getRouteState(route));
   }
 
   if (req.method === "GET" && url.pathname === "/api/state") {
     return sendJson(res, 200, getPublicState());
   }
 
-  if (req.method === "GET" && url.pathname === "/api/export") {
-    const route = normalizeScoreRoute(url.searchParams.get("route"));
-    const exportState = route ? filterPublicStateByRoute(getPublicState(), route) : getPublicState();
-    res.writeHead(200, {
-      "Content-Type": "application/json; charset=utf-8",
-      "Content-Disposition": `attachment; filename="scoreboard${route ? `-${route}` : ""}-${new Date().toISOString().slice(0, 10)}.json"`
-    });
-    return res.end(JSON.stringify(exportState, null, 2));
-  }
-
   if (req.method === "GET" && url.pathname === "/api/events") {
+    const routeValue = url.searchParams.get("route");
+    const route = normalizeScoreRoute(routeValue);
+    if (routeValue !== null && !route) return sendError(res, 400, "请选择A或B路线");
+    if (route && !requireScoreAccess(req, res, route)) return;
     res.writeHead(200, {
       "Content-Type": "text/event-stream; charset=utf-8",
       "Cache-Control": "no-cache, no-transform",
@@ -433,8 +635,8 @@ async function handleApi(req, res, url) {
       "X-Accel-Buffering": "no"
     });
     res.write(": connected\n\n");
-    sseClients.add(res);
-    res.write(`event: state\ndata: ${JSON.stringify(getPublicState())}\n\n`);
+    sseClients.set(res, route || "");
+    res.write(`event: state\ndata: ${JSON.stringify(route ? getRouteState(route) : getPublicState())}\n\n`);
 
     const cleanup = () => {
       clearInterval(heartbeat);
@@ -456,27 +658,7 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/teams") {
-    const body = await readJsonBody(req);
-    const name = String(body.name || "").trim();
-    if (!name) return sendError(res, 400, "请填写队伍名称");
-
-    let created;
-    commit((draft) => {
-      created = normalizeTeam({
-        id: crypto.randomUUID(),
-        name,
-        route: normalizeScoreRoute(body.route) || "A",
-        order: toNullableNumber(body.order),
-        color: body.color,
-        scoreEvents: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
-      draft.teams.push(created);
-      draft.teams.sort(compareTeamDisplay);
-    });
-
-    return sendJson(res, 201, { team: created });
+    return sendError(res, 403, "队伍只能从在线题库同步，计分台不支持手工添加");
   }
 
   const teamMatch = url.pathname.match(/^\/api\/teams\/([^/]+)$/);
@@ -484,6 +666,10 @@ async function handleApi(req, res, url) {
     const body = await readJsonBody(req);
     const team = findTeam(teamMatch[1]);
     if (!team) return sendError(res, 404, "未找到队伍");
+    if (!requireScoreAccess(req, res, team.route)) return;
+    if (team.source === "quiz" && ["name", "route", "color"].some((field) => body[field] !== undefined)) {
+      return sendError(res, 400, "题库同步队伍只能编辑序号，名称和路线请在题库系统中维护");
+    }
 
     commit((draft) => {
       if (body.name !== undefined) team.name = String(body.name || "").trim() || team.name;
@@ -499,7 +685,10 @@ async function handleApi(req, res, url) {
 
   if (teamMatch && req.method === "DELETE") {
     const id = teamMatch[1];
-    if (!findTeam(id)) return sendError(res, 404, "未找到队伍");
+    const team = findTeam(id);
+    if (!team) return sendError(res, 404, "未找到队伍");
+    if (!requireScoreAccess(req, res, team.route)) return;
+    if (team.source === "quiz") return sendError(res, 409, "题库同步队伍不能在计分台删除");
 
     commit((draft) => {
       draft.teams = draft.teams.filter((team) => team.id !== id);
@@ -513,6 +702,7 @@ async function handleApi(req, res, url) {
     const body = await readJsonBody(req);
     const team = findTeam(finishMatch[1]);
     if (!team) return sendError(res, 404, "未找到队伍");
+    if (!requireScoreAccess(req, res, team.route)) return;
 
     commit(() => {
       const finishedAt = normalizeDate(body.finishedAt) || new Date().toISOString();
@@ -528,6 +718,7 @@ async function handleApi(req, res, url) {
   if (unfinishMatch && req.method === "POST") {
     const team = findTeam(unfinishMatch[1]);
     if (!team) return sendError(res, 404, "未找到队伍");
+    if (!requireScoreAccess(req, res, team.route)) return;
 
     commit(() => {
       team.finishedAt = null;
@@ -543,16 +734,24 @@ async function handleApi(req, res, url) {
     const body = await readJsonBody(req);
     const team = findTeam(scoreMatch[1]);
     if (!team) return sendError(res, 404, "未找到队伍");
+    if (!requireScoreAccess(req, res, team.route)) return;
 
     const points = Number(body.points);
-    if (![1, 2, 3].includes(points)) {
-      return sendError(res, 400, "分值只能是 1、2、3");
+    const teamRoute = normalizeScoreRoute(team.route);
+    const requestRoute = normalizeScoreRoute(body.route);
+    if (!requestRoute || requestRoute !== teamRoute) {
+      return sendError(res, 400, `只能在队伍所属的${teamRoute}路线计分台打分`);
+    }
+
+    const allowedPoints = teamRoute === "A" ? [1, 2, 0] : [2, 3, 0];
+    if (!allowedPoints.includes(points)) {
+      return sendError(res, 400, `${teamRoute}路线分值只能是 ${allowedPoints.join("、")}`);
     }
 
     const event = normalizeScoreEvent({
       id: crypto.randomUUID(),
       points,
-      route: body.route,
+      route: teamRoute,
       operator: body.operator,
       createdAt: new Date().toISOString()
     });
@@ -569,6 +768,7 @@ async function handleApi(req, res, url) {
   if (scoreDeleteMatch && req.method === "DELETE") {
     const team = findTeam(scoreDeleteMatch[1]);
     if (!team) return sendError(res, 404, "未找到队伍");
+    if (!requireScoreAccess(req, res, team.route)) return;
     if (!team.scoreEvents.some((event) => event.id === scoreDeleteMatch[2])) {
       return sendError(res, 404, "未找到得分记录");
     }
@@ -576,18 +776,6 @@ async function handleApi(req, res, url) {
     commit(() => {
       team.scoreEvents = team.scoreEvents.filter((event) => event.id !== scoreDeleteMatch[2]);
       team.updatedAt = new Date().toISOString();
-    });
-
-    return sendJson(res, 200, { ok: true });
-  }
-
-  if (req.method === "POST" && url.pathname === "/api/reset") {
-    const body = await readJsonBody(req);
-    if (body.confirm !== "RESET") return sendError(res, 400, "确认口令无效");
-    const route = normalizeScoreRoute(body.route);
-
-    commit((draft) => {
-      draft.teams = route ? draft.teams.filter((team) => team.route !== route) : [];
     });
 
     return sendJson(res, 200, { ok: true });
@@ -603,6 +791,12 @@ function serveStatic(req, res, url) {
   if (pathname === "/score") pathname = "/score-a.html";
   if (pathname === "/score-a") pathname = "/score-a.html";
   if (pathname === "/score-b") pathname = "/score-b.html";
+  if (pathname === "/score.html") pathname = "/score-a.html";
+
+  const scoreRoute = pathname === "/score-a.html" ? "A" : pathname === "/score-b.html" ? "B" : "";
+  if (scoreRoute && !hasScoreAccess(req, scoreRoute)) {
+    return sendRedirect(res, `/score-login.html?route=${scoreRoute}`);
+  }
 
   const filePath = path.normalize(path.join(PUBLIC_DIR, pathname));
   if (!filePath.startsWith(PUBLIC_DIR)) {
@@ -647,6 +841,11 @@ server.listen(PORT, HOST, () => {
   console.log(`本机访问: http://localhost:${PORT}`);
   for (const url of getLanUrls()) {
     console.log(`局域网访问: ${url}`);
+  }
+  if (QUIZ_TEAMS_URL) {
+    syncQuizTeams();
+    quizSyncTimer = setInterval(syncQuizTeams, QUIZ_SYNC_INTERVAL_MS);
+    quizSyncTimer.unref();
   }
 });
 

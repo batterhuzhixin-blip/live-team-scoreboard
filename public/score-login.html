@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>现场统分系统｜计分台登录</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css?v=20260810-1" />
+  </head>
+  <body class="score-login-page">
+    <main class="score-login-card">
+      <p class="eyebrow">计分台访问验证</p>
+      <h1 id="loginTitle">计分台登录</h1>
+      <p id="loginHint">请输入登录口令后继续。</p>
+      <form id="scoreLoginForm" class="score-login-form">
+        <label class="field">
+          <span>登录口令</span>
+          <input id="scorePassword" type="password" autocomplete="current-password" required autofocus />
+        </label>
+        <p id="loginError" class="login-error" role="alert" hidden></p>
+        <button id="loginSubmit" type="submit" class="primary-btn">进入计分台</button>
+      </form>
+      <a class="nav-link login-rank-link" href="/rank.html">返回比赛大屏</a>
+    </main>
+    <script src="/score-login.js?v=20260809-2"></script>
+  </body>
+</html>

@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#123b33" />
+    <title>题库管理｜财趣答题赛</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/quiz.css?v=20260805-2" />
+  </head>
+  <body class="admin-body">
+    <div class="app-shell">
+      <header class="site-header">
+        <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">财</span><span><strong>题库管理</strong><small>QUIZ ADMIN</small></span></a>
+        <a class="back-link" href="/">← 返回答题首页</a>
+      </header>
+      <main class="admin-main">
+        <section class="admin-login-card" id="adminLoginView">
+          <span class="admin-lock" aria-hidden="true">管</span>
+          <p class="eyebrow">ADMIN ACCESS</p>
+          <h1>管理员验证</h1>
+          <p>验证管理密码后，可下载模板和更新全场共享题库。</p>
+          <form id="adminLoginForm" class="auth-form">
+            <label class="field"><span>管理密码</span><input name="password" type="password" autocomplete="current-password" required placeholder="请输入管理密码" /></label>
+            <button class="primary-button" type="submit">进入管理台 <span aria-hidden="true">→</span></button>
+          </form>
+        </section>
+
+        <section class="admin-dashboard hidden" id="adminDashboard">
+          <div class="admin-title-row">
+            <div><p class="eyebrow">QUESTION LIBRARY</p><h1>共享题库管理</h1><p>上传一次，全体参赛队伍即可使用；每队的答题进度仍独立保存。</p></div>
+            <button class="text-button" id="adminLogoutBtn" type="button">退出管理</button>
+          </div>
+          <div class="admin-stat-grid" id="adminStats"></div>
+          <section class="team-management-card">
+            <div class="history-head"><div><h2>队伍信息导入</h2><p>提前录入参赛队伍，选手注册时只能引用尚未被使用的队伍。</p></div><span id="teamCountLabel">0 个队伍</span></div>
+            <div class="team-management-body">
+              <form id="teamImportForm" class="team-import-form">
+                <label class="field"><span>队伍名称</span><textarea id="teamNames" name="names" rows="7" maxlength="20000" required placeholder="每行填写一个队伍名称&#10;例如：&#10;乘风破浪队&#10;财智先锋队"></textarea></label>
+                <button class="primary-button" id="teamImportButton" type="submit">批量导入队伍 <span aria-hidden="true">→</span></button>
+              </form>
+              <div class="team-library" id="teamList"></div>
+            </div>
+          </section>
+          <div class="admin-workspace">
+            <section class="upload-card">
+              <div class="card-title"><span class="step-number">01</span><div><h2>准备 Excel 题库</h2><p>模板支持单选、多选、判断和看图纠错，内含四类示例及填写说明。</p></div></div>
+              <a class="secondary-button" href="/api/admin/template" download>下载 Excel 模板 <span aria-hidden="true">↓</span></a>
+              <div class="template-columns"><span>题型</span><span>档位</span><span>题目</span><span>图片地址</span><span>选项A–D</span><span>正确答案</span><span>解析</span></div>
+            </section>
+            <section class="upload-card">
+              <div class="card-title"><span class="step-number">02</span><div><h2>上传并导入</h2><p>支持标准 .xlsx 文件，单个文件不超过 8MB。</p></div></div>
+              <form id="uploadForm">
+                <label class="drop-zone" id="dropZone">
+                  <input id="quizFile" name="file" type="file" accept=".xlsx" required />
+                  <span class="upload-icon" aria-hidden="true">↑</span>
+                  <strong id="fileName">点击选择或拖入 Excel 文件</strong>
+                  <small id="fileMeta">尚未选择文件</small>
+                </label>
+                <fieldset class="import-mode">
+                  <legend>导入方式</legend>
+                  <label><input type="radio" name="mode" value="replace" checked /><span><b>替换题库</b><small>用本次文件更新全部题目</small></span></label>
+                  <label><input type="radio" name="mode" value="append" /><span><b>追加题目</b><small>保留原题库并添加新题</small></span></label>
+                </fieldset>
+                <button class="primary-button" id="uploadButton" type="submit">开始导入 <span aria-hidden="true">→</span></button>
+              </form>
+            </section>
+          </div>
+          <section class="user-management-card">
+            <div class="history-head"><div><h2>用户管理</h2><p>查看参赛账号与独立答题数据</p></div><span id="userCountLabel">0 个用户</span></div>
+            <div id="userList" class="user-list"></div>
+          </section>
+          <section class="question-preview-card">
+            <div class="history-head"><h2>题库预览</h2><span>最近更新的题目</span></div>
+            <div id="questionPreview" class="question-preview"></div>
+          </section>
+        </section>
+      </main>
+      <footer class="site-footer">
+        <span>财务趣味竞赛 · 题库管理</span>
+        <span class="footer-links">
+          <a href="/">选手答题入口</a>
+          <a class="icp-link" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">桂ICP备2026015627号</a>
+        </span>
+      </footer>
+    </div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="/admin.js?v=20260805-2"></script>
+  </body>
+</html>

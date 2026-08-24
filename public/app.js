@@ -1,16 +1,22 @@
 const page = document.body.dataset.page;
 const scoreRoute = document.body.dataset.scoreRoute || "";
 let currentState = null;
-let staffName = localStorage.getItem("scorekeeperName") || "";
 let eventsConnection = null;
 let pollTimer = null;
 let renderFrame = null;
 
-const quickScores = [
-  { label: "加 1 分", points: 1 },
-  { label: "加 2 分", points: 2 },
-  { label: "加 3 分", points: 3 }
-];
+const scoreOptionsByRoute = {
+  A: [
+    { buttonLabel: "得 1 分", statLabel: "1分题", points: 1 },
+    { buttonLabel: "得 2 分", statLabel: "2分题", points: 2 },
+    { buttonLabel: "0 分（不得分）", statLabel: "不得分", points: 0 }
+  ],
+  B: [
+    { buttonLabel: "得 2 分", statLabel: "2分题", points: 2 },
+    { buttonLabel: "得 3 分", statLabel: "3分题", points: 3 },
+    { buttonLabel: "0 分（不得分）", statLabel: "不得分", points: 0 }
+  ]
+};
 
 document.addEventListener("DOMContentLoaded", () => {
   if (page === "score") initScorePage();
@@ -19,45 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function initScorePage() {
-  const staffInput = document.querySelector("#staffName");
-  staffInput.value = staffName;
-  staffInput.addEventListener("input", () => {
-    staffName = staffInput.value.trim();
-    localStorage.setItem("scorekeeperName", staffName);
-  });
-
-  document.querySelector("#teamForm").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    await api("/api/teams", {
-      method: "POST",
-      body: {
-        name: formData.get("name"),
-        route: scoreRoute,
-        order: formData.get("order")
-      }
-    });
-    form.reset();
-    toast("队伍已添加");
-  });
-
   document.querySelector("#teamsList").addEventListener("click", onTeamsListClick);
-
-  document.querySelector("#exportBtn").addEventListener("click", () => {
-    const routeQuery = scoreRoute ? `?route=${encodeURIComponent(scoreRoute)}` : "";
-    window.open(`/api/export${routeQuery}`, "_blank");
-  });
-
-  document.querySelector("#resetBtn").addEventListener("click", async () => {
-    const ok = window.confirm(`确定清空${scoreRoute || "当前"}路线的所有队伍和得分记录吗？`);
-    if (!ok) return;
-    await api("/api/reset", {
-      method: "POST",
-      body: { confirm: "RESET", route: scoreRoute }
-    });
-    toast(`${scoreRoute || "当前"}路线成绩已清空`);
-  });
 }
 
 function connectEvents() {
@@ -68,7 +36,7 @@ function connectEvents() {
     return;
   }
 
-  eventsConnection = new EventSource("/api/events");
+  eventsConnection = new EventSource(scoreApiUrl("/api/events"));
   eventsConnection.addEventListener("open", () => setConnection(true));
   eventsConnection.addEventListener("error", () => {
     setConnection(false);
@@ -117,7 +85,9 @@ document.addEventListener("visibilitychange", () => {
 
 async function fetchState() {
   try {
-    const response = await fetch("/api/state", { cache: "no-store" });
+    const response = await fetch(scoreApiUrl("/api/state"), { cache: "no-store" });
+    if (response.status === 401 && page === "score") return redirectToScoreLogin();
+    if (!response.ok) throw new Error("State request failed");
     currentState = await response.json();
     scheduleRender();
   } catch (error) {
@@ -132,11 +102,28 @@ async function api(url, options = {}) {
     body: options.body ? JSON.stringify(options.body) : undefined
   });
   const data = await response.json().catch(() => ({}));
+  if (response.status === 401 && page === "score") {
+    redirectToScoreLogin();
+    throw new Error("Authentication required");
+  }
   if (!response.ok) {
     toast(data.error || "操作失败");
     throw new Error(data.error || "Request failed");
   }
   return data;
+}
+
+function scoreApiUrl(pathname) {
+  if (page !== "score") return pathname;
+  const separator = pathname.includes("?") ? "&" : "?";
+  if (pathname === "/api/state") return `/api/score-state?route=${encodeURIComponent(scoreRoute)}`;
+  if (pathname === "/api/events") return `/api/events?route=${encodeURIComponent(scoreRoute)}`;
+  return `${pathname}${separator}route=${encodeURIComponent(scoreRoute)}`;
+}
+
+function redirectToScoreLogin() {
+  closeEvents();
+  window.location.replace(`/score-login.html?route=${encodeURIComponent(scoreRoute)}`);
 }
 
 function render() {
@@ -156,7 +143,6 @@ function scheduleRender() {
 function renderScorePage() {
   renderScoreSummary();
   renderTeams();
-  renderScoreRankList();
 }
 
 function renderScoreSummary() {
@@ -200,11 +186,12 @@ function teamCard(team) {
     <div class="team-card-head">
       <div class="team-title-block">
         <div class="team-title-line">
-          <span class="rank-badge">${getDisplayRank(team)}</span>
+          ${teamOrderBadge(team)}
           <h3>${escapeHtml(team.name)}</h3>
         </div>
         <div class="team-meta">
           <span>序号 ${team.order ?? "--"}</span>
+          <span>${team.source === "quiz" ? "题库同步" : "手动添加"}</span>
           <span>${team.scoreCount} 条记录</span>
           <span>${team.completed ? `完赛第 ${team.finishOrder}` : "未完赛"}</span>
         </div>
@@ -220,34 +207,33 @@ function teamCard(team) {
             ? '<button type="button" class="warn-btn" data-action="unfinish-team">撤回完赛</button>'
             : '<button type="button" class="primary-btn" data-action="finish-team">完赛</button>'
         }
-        <button type="button" class="ghost-btn" data-action="edit-team">编辑</button>
-        <button type="button" class="danger-ghost-btn" data-action="delete-team">删除</button>
+        ${team.source === "quiz"
+          ? '<button type="button" class="ghost-btn" data-action="edit-team">编辑序号</button>'
+          : '<button type="button" class="ghost-btn" data-action="edit-team">编辑</button><button type="button" class="danger-ghost-btn" data-action="delete-team">删除</button>'}
       </div>
     </div>
 
-    <div class="question-counts" aria-label="答对题型统计">
-      <div class="question-count-item">
-        <span>1分题</span>
-        <strong>${questionCount(team, 1)}</strong>
-      </div>
-      <div class="question-count-item">
-        <span>2分题</span>
-        <strong>${questionCount(team, 2)}</strong>
-      </div>
-      <div class="question-count-item">
-        <span>3分题</span>
-        <strong>${questionCount(team, 3)}</strong>
-      </div>
+    <div class="question-counts" aria-label="答题得分统计">
+      ${scoreOptions(team.route)
+        .map(
+          (item) => `
+            <div class="question-count-item">
+              <span>${item.statLabel}</span>
+              <strong>${questionCount(team, item.points)}</strong>
+            </div>
+          `
+        )
+        .join("")}
     </div>
 
     <div class="score-entry-panel">
       <div class="quick-score-row">
-        ${quickScores
+        ${scoreOptions(scoreRoute)
           .map(
             (item) => `
-              <button type="button" class="quick-plus"
+              <button type="button" class="${item.points === 0 ? "quick-zero" : "quick-plus"}"
                 data-action="quick-score" data-points="${item.points}">
-                ${item.label}
+                ${item.buttonLabel}
               </button>
             `
           )
@@ -270,15 +256,16 @@ function teamCard(team) {
 function scoreEventRow(event) {
   const operator = event.operator ? `<span>${escapeHtml(event.operator)}</span>` : "";
   const route = event.route ? `<span class="score-event-route route-${event.route.toLowerCase()}">${escapeHtml(event.route)}路线</span>` : "";
+  const isZero = Number(event.points) === 0;
 
   return `
-    <div class="score-event is-plus">
+    <div class="score-event ${isZero ? "is-zero" : "is-plus"}">
       <div>
         ${route}
         <span>${formatTime(event.createdAt)}</span>
         ${operator}
       </div>
-      <b>${formatSignedScore(event.points)}</b>
+      <b>${isZero ? "0（不得分）" : formatSignedScore(event.points)}</b>
       <button type="button" class="ghost-btn icon-btn" title="撤销" data-action="delete-score" data-score-id="${event.id}">×</button>
     </div>
   `;
@@ -288,8 +275,14 @@ function questionCount(team, points) {
   return Number((team.questionCounts || {})[points] || 0);
 }
 
-function getDisplayRank(team) {
-  return scoreRoute ? team.routeRank || "--" : team.rank || "--";
+function scoreOptions(route) {
+  return scoreOptionsByRoute[String(route || "").toUpperCase()] || [];
+}
+
+function teamOrderBadge(team) {
+  const order = team.order ?? "--";
+  const label = team.order ?? "未设置";
+  return `<span class="rank-badge team-order-badge" title="队伍序号" aria-label="队伍序号 ${escapeHtml(label)}">${escapeHtml(order)}</span>`;
 }
 
 async function onTeamsListClick(event) {
@@ -323,10 +316,7 @@ async function onTeamsListClick(event) {
   }
 
   if (action === "finish-team") {
-    await api(`/api/teams/${team.id}/finish`, {
-      method: "POST",
-      body: { finishedBy: staffName }
-    });
+    await api(`/api/teams/${team.id}/finish`, { method: "POST" });
     toast(`${team.name} 已登记完赛`);
     return;
   }
@@ -349,14 +339,24 @@ async function addScore(teamId, points) {
     method: "POST",
     body: {
       points,
-      route: scoreRoute,
-      operator: staffName
+      route: scoreRoute
     }
   });
   toast("分数已更新");
 }
 
 async function editTeam(team) {
+  if (team.source === "quiz") {
+    const order = window.prompt("队伍序号（留空表示不设置）", team.order ?? "");
+    if (order === null) return;
+    await api(`/api/teams/${team.id}`, {
+      method: "PATCH",
+      body: { order }
+    });
+    toast("队伍序号已更新");
+    return;
+  }
+
   const name = window.prompt("队伍名称", team.name);
   if (name === null) return;
   const order = window.prompt("序号", team.order ?? "");
@@ -369,143 +369,83 @@ async function editTeam(team) {
   toast("队伍信息已更新");
 }
 
-function renderScoreRankList() {
-  const list = document.querySelector("#scoreRankList");
-  list.innerHTML = "";
-  const rankedTeams = currentState.ranked.filter((team) => !scoreRoute || team.route === scoreRoute);
-
-  if (!rankedTeams.length) {
-    const empty = document.createElement("div");
-    empty.className = "empty-state";
-    empty.textContent = `暂无${scoreRoute || ""}路线排名`;
-    list.appendChild(empty);
-    return;
-  }
-
-  rankedTeams.forEach((team) => {
-    const row = document.createElement("div");
-    row.className = "mini-rank-row";
-    row.style.setProperty("--team-color", team.color);
-    row.innerHTML = `
-      <span class="rank-badge">${getDisplayRank(team)}</span>
-      <strong>${escapeHtml(team.name)}</strong>
-      <span>${formatScore(team.totalScore)}</span>
-    `;
-    list.appendChild(row);
-  });
-}
-
 function renderRankPage() {
-  const leadScore = currentState.totals.leadScore;
-  const leadTeams = currentState.ranked
-    .filter((team) => team.totalScore === leadScore)
-    .map((team) => team.name)
-    .join("、") || "--";
-  const activeTeams = currentState.totals.teams - currentState.totals.completedTeams;
+  const routeATeams = currentState.teams.filter((team) => team.route === "A");
+  const routeBTeams = currentState.teams.filter((team) => team.route === "B");
+  const routeALead = routeATeams.length ? Math.max(...routeATeams.map((team) => team.totalScore)) : 0;
+  const routeBLead = routeBTeams.length ? Math.max(...routeBTeams.map((team) => team.totalScore)) : 0;
 
   renderSummary("#rankSummary", [
-    ["最高分", leadScore],
-    ["最高分队伍", leadTeams],
-    ["已完赛", currentState.totals.completedTeams],
-    ["正在比赛", activeTeams]
+    ["A路线队伍", routeATeams.length],
+    ["A路线最高分", routeALead],
+    ["B路线队伍", routeBTeams.length],
+    ["B路线最高分", routeBLead]
   ]);
-  renderPodium();
-  renderScoreboardGrid();
+  renderOverallRanking(currentState.teams);
+  renderRouteScoreboard("A", routeATeams);
+  renderRouteScoreboard("B", routeBTeams);
 
   const lastUpdated = document.querySelector("#lastUpdated");
   if (lastUpdated) lastUpdated.textContent = `更新 ${formatTime(currentState.updatedAt)}`;
 
-  const screenTeamCount = document.querySelector("#screenTeamCount");
-  if (screenTeamCount) screenTeamCount.textContent = `${currentState.totals.teams} 支队伍`;
 }
 
-function renderPodium() {
-  const podium = document.querySelector("#podium");
-  podium.innerHTML = "";
-  const topTeams = currentState.ranked.slice(0, 3);
-
-  if (!topTeams.length) {
-    const empty = document.createElement("div");
-    empty.className = "empty-state screen-empty";
-    empty.textContent = "暂无队伍";
-    podium.appendChild(empty);
-    return;
-  }
-
-  topTeams.forEach((team) => {
-    const item = document.createElement("article");
-    item.className = `podium-card rank-${team.rank}`;
-    item.style.setProperty("--team-color", team.color);
-    item.innerHTML = `
-      <span class="rank-badge large">${team.rank}</span>
-      <div>
-        <h2>${escapeHtml(team.name)}</h2>
-        <p>${routeLabel(team.route)} · ${finishStatusText(team)} · 1分题 ${questionCount(team, 1)} · 2分题 ${questionCount(team, 2)} · 3分题 ${questionCount(team, 3)}</p>
-      </div>
-      <strong>${formatScore(team.totalScore)}</strong>
-    `;
-    podium.appendChild(item);
-  });
-}
-
-function renderScoreboardGrid() {
-  const grid = document.querySelector("#scoreboardGrid");
+function renderOverallRanking(teams) {
+  const grid = document.querySelector("#overallRankingGrid");
+  const count = document.querySelector("#overallCount");
   grid.innerHTML = "";
+  count.textContent = `${teams.length} 支队伍`;
 
-  if (!currentState.ranked.length) {
+  if (!teams.length) {
     const empty = document.createElement("div");
     empty.className = "empty-state screen-empty";
-    empty.textContent = "暂无队伍";
+    empty.textContent = "暂无参赛队伍";
     grid.appendChild(empty);
     return;
   }
 
-  currentState.ranked.forEach((team) => {
-    const card = document.createElement("article");
-    card.className = "screen-team-card";
-    card.style.setProperty("--team-color", team.color);
-
-    card.innerHTML = `
-      <div class="screen-rank">
-        <span class="rank-badge">${team.rank}</span>
-      </div>
-      <div class="screen-team-main">
-        <h3>${escapeHtml(team.name)}</h3>
-        <div class="screen-team-meta">
-          <span>${routeLabel(team.route)}</span>
-          <span>序号 ${team.order ?? "--"}</span>
-          <span>记录 ${team.scoreCount}</span>
-          <span>加分 ${team.positiveCount}</span>
-        </div>
-        <div class="screen-question-counts">
-          ${screenQuestionStats(team)}
-        </div>
-        <div class="screen-finish-line">
-          <span>完赛顺序</span>
-          <strong>${finishStatusText(team)}</strong>
-        </div>
-      </div>
-      <strong class="screen-score">${formatScore(team.totalScore)}</strong>
-    `;
-    grid.appendChild(card);
-  });
+  teams
+    .slice()
+    .sort((a, b) => (a.rank || Number.POSITIVE_INFINITY) - (b.rank || Number.POSITIVE_INFINITY))
+    .forEach((team) => grid.appendChild(rankListItem(team, team.rank)));
 }
 
-function screenQuestionStats(team) {
-  return [1, 2, 3]
-    .map(
-      (points) => `
-        <div class="screen-question-item">
-          <span>${points}分题</span>
-          <strong>${questionCount(team, points)}</strong>
-        </div>
-      `
-    )
-    .join("");
+function renderRouteScoreboard(route, teams) {
+  const grid = document.querySelector(`#route${route}Grid`);
+  const count = document.querySelector(`#route${route}Count`);
+  grid.innerHTML = "";
+  count.textContent = `${teams.length} 支队伍`;
+
+  if (!teams.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state screen-empty";
+    empty.textContent = `暂无${route}路线队伍`;
+    grid.appendChild(empty);
+    return;
+  }
+
+  teams
+    .slice()
+    .sort((a, b) => (a.routeRank || Number.POSITIVE_INFINITY) - (b.routeRank || Number.POSITIVE_INFINITY))
+    .forEach((team) => grid.appendChild(rankListItem(team, team.routeRank)));
 }
 
-function finishStatusText(team) {
-  return team.completed ? `第 ${team.finishOrder} 名 · +${formatScore(team.finishScore)}` : "未完赛";
+function rankListItem(team, rank) {
+  const item = document.createElement("article");
+  item.className = "rank-list-item";
+  item.style.setProperty("--team-color", team.color);
+  item.innerHTML = `
+    <div class="ranking-leading">
+      <span class="rank-position">第 ${rank || "--"} 名</span>
+      ${teamOrderBadge(team)}
+    </div>
+    <div class="rank-list-team">
+      <strong>${escapeHtml(team.name)}</strong>
+      <span class="rank-list-route route-${String(team.route || "").toLowerCase()}">${escapeHtml(routeLabel(team.route))}</span>
+    </div>
+    <strong class="rank-list-score">${formatScore(team.totalScore)}</strong>
+  `;
+  return item;
 }
 
 function routeLabel(route) {

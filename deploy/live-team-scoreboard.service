@@ -1,0 +1,28 @@
+[Unit]
+Description=Live Team Scoreboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=scoreboard
+Group=scoreboard
+WorkingDirectory=/opt/live-team-scoreboard
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=3000
+Environment=DATA_DIR=/var/lib/live-team-scoreboard
+Environment=QUIZ_TEAMS_URL=http://127.0.0.1:3001/api/integrations/scoreboard/teams
+Environment=QUIZ_SYNC_INTERVAL_MS=10000
+EnvironmentFile=/etc/live-team-scoreboard.env
+ExecStart=/usr/bin/node /opt/live-team-scoreboard/server.js
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+ReadWritePaths=/var/lib/live-team-scoreboard
+
+[Install]
+WantedBy=multi-user.target

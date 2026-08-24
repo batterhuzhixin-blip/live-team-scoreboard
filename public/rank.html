@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>现场统分系统｜大屏</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/styles.css?v=20260810-1" />
   </head>
   <body data-page="rank" class="screen-body">
     <header class="topbar screen-topbar">
       <div class="brand">
-        <strong>现场统分系统</strong>
-        <span>大屏</span>
+        <span class="brand-mark" aria-hidden="true">财</span>
+        <span class="brand-copy"><strong>现场统分系统</strong><small>LIVE SCOREBOARD · SCREEN</small></span>
       </div>
       <nav class="nav-actions" aria-label="页面导航">
         <a class="nav-link" href="/score-a.html">A路线计分台</a>
@@ -32,18 +32,41 @@
         </div>
       </section>
 
-      <section class="podium-band" id="podium"></section>
-
-      <section class="screen-board">
-        <div class="section-title">
-          <h2>全部队伍</h2>
-          <span id="screenTeamCount">--</span>
+      <section class="screen-board overall-board">
+        <div class="section-title overall-board-title">
+          <div>
+            <span class="live-dot" aria-hidden="true"></span>
+            <h2>实时汇总排名</h2>
+          </div>
+          <span id="overallCount">--</span>
         </div>
-        <div class="scoreboard-grid" id="scoreboardGrid"></div>
+        <div class="overall-ranking-grid" id="overallRankingGrid"></div>
       </section>
+
+      <div class="route-boards">
+        <section class="screen-board route-board route-board-a">
+          <div class="section-title route-board-title">
+            <div><span class="route-mark">A</span><h2>A路线得分排名</h2></div>
+            <span id="routeACount">--</span>
+          </div>
+          <div class="scoreboard-grid route-scoreboard-grid" id="routeAGrid"></div>
+        </section>
+
+        <section class="screen-board route-board route-board-b">
+          <div class="section-title route-board-title">
+            <div><span class="route-mark">B</span><h2>B路线得分排名</h2></div>
+            <span id="routeBCount">--</span>
+          </div>
+          <div class="scoreboard-grid route-scoreboard-grid" id="routeBGrid"></div>
+        </section>
+      </div>
     </main>
 
+    <footer class="compliance-footer">
+      <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">桂ICP备2026015627号</a>
+    </footer>
+
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="/app.js"></script>
+    <script src="/app.js?v=20260809-2"></script>
   </body>
 </html>

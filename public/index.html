@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#123b33" />
+    <meta name="description" content="财务趣味竞赛在线答题系统" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="财趣答题赛" />
+    <meta property="og:description" content="三档共享题库，队伍独立答题计分。" />
+    <meta property="og:url" content="__SITE_ORIGIN__/" />
+    <meta property="og:image" content="__SITE_ORIGIN__/og.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="财趣答题赛" />
+    <meta name="twitter:description" content="三档共享题库，队伍独立答题计分。" />
+    <meta name="twitter:image" content="__SITE_ORIGIN__/og.png" />
+    <title>财趣答题赛</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/quiz.css?v=20260805-2" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="site-header">
+        <a class="brand" href="/" aria-label="财趣答题赛首页">
+          <span class="brand-mark" aria-hidden="true">财</span>
+          <span><strong>财趣答题赛</strong><small>FINANCE QUIZ</small></span>
+        </a>
+        <div class="header-user hidden" id="headerUser">
+          <span class="team-pill" id="teamPill"></span>
+          <button class="text-button" id="logoutBtn" type="button">退出</button>
+        </div>
+      </header>
+
+      <main>
+        <section class="auth-view" id="authView">
+          <div class="auth-copy">
+            <p class="eyebrow">趣味财务知识挑战</p>
+            <h1>每一道题，<br /><span>都是新的得分机会。</span></h1>
+            <p class="lead">三个难度档位，同一套公平题库。登录你的队伍账号，独立记录每一次作答。</p>
+            <div class="tier-mini-list" aria-label="题库计分规则">
+              <span><b>01</b> 基础题 · 答对 +1</span>
+              <span><b>02</b> 进阶题 · 答对 +2</span>
+              <span><b>03</b> 挑战题 · 答对 +3</span>
+            </div>
+          </div>
+
+          <div class="auth-card">
+            <div class="auth-tabs" role="tablist" aria-label="账号操作">
+              <button class="auth-tab active" type="button" role="tab" aria-selected="true" data-auth-tab="login">登录</button>
+              <button class="auth-tab" type="button" role="tab" aria-selected="false" data-auth-tab="register">注册</button>
+            </div>
+
+            <form id="loginForm" class="auth-form" autocomplete="on">
+              <div class="form-heading">
+                <h2>欢迎回来</h2>
+                <p>继续为你的队伍赢得分数</p>
+              </div>
+              <label class="field">
+                <span>登录账号</span>
+                <input name="username" autocomplete="username" required maxlength="24" placeholder="请输入账号" />
+              </label>
+              <label class="field">
+                <span>登录密码</span>
+                <input name="password" type="password" autocomplete="current-password" required maxlength="72" placeholder="请输入密码" />
+              </label>
+              <button class="primary-button" type="submit">进入答题区 <span aria-hidden="true">→</span></button>
+            </form>
+
+            <form id="registerForm" class="auth-form hidden" autocomplete="on">
+              <div class="form-heading">
+                <h2>创建队伍账号</h2>
+                <p>每支参赛队伍只需注册一次</p>
+              </div>
+              <label class="field">
+                <span>队伍信息</span>
+                <select id="teamSelect" name="teamId" required>
+                  <option value="">请先选择自己的队伍</option>
+                </select>
+                <small class="field-help" id="teamAvailability">队伍信息由管理员提前录入，注册成功后将自动锁定。</small>
+              </label>
+              <fieldset class="route-field">
+                <legend>答题路线</legend>
+                <div class="route-choice-grid">
+                  <label class="route-choice">
+                    <input type="radio" name="route" value="A" required />
+                    <span><strong>A路线</strong><small>可使用 1档、2档答题包</small></span>
+                  </label>
+                  <label class="route-choice">
+                    <input type="radio" name="route" value="B" required />
+                    <span><strong>B路线</strong><small>可使用 2档、3档答题包</small></span>
+                  </label>
+                </div>
+                <small class="field-help">路线在注册后固定，如需更换请联系管理员删除账号后重新注册。</small>
+              </fieldset>
+              <label class="field">
+                <span>登录账号</span>
+                <input name="username" autocomplete="username" required minlength="3" maxlength="24" placeholder="3–24位字符" />
+              </label>
+              <label class="field">
+                <span>设置密码</span>
+                <input name="password" type="password" autocomplete="new-password" required minlength="6" maxlength="72" placeholder="至少6位" />
+              </label>
+              <button class="primary-button" type="submit">注册并开始答题 <span aria-hidden="true">→</span></button>
+            </form>
+            <p class="auth-note">答题数据仅当前队伍可见</p>
+          </div>
+        </section>
+
+        <section class="dashboard-view hidden" id="dashboardView">
+          <div class="dashboard-head">
+            <div>
+              <p class="eyebrow">今日挑战</p>
+              <h1><span id="welcomeTeam">参赛队伍</span>，准备好了吗？</h1>
+              <p id="routeHint">按照所选路线使用对应答题包，每道题只有一次回答机会。</p>
+            </div>
+            <div class="score-hero" aria-label="当前总分">
+              <span>当前总分</span>
+              <strong id="heroScore">0</strong>
+              <small>POINTS</small>
+            </div>
+          </div>
+
+          <section class="quiz-section" aria-labelledby="quizPacksTitle">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">QUIZ PACKS</p>
+                <h2 id="quizPacksTitle">选择答题包</h2>
+              </div>
+              <span class="shared-badge">全场共享题库 · 独立进度</span>
+            </div>
+            <div class="tier-grid" id="tierGrid"></div>
+          </section>
+
+          <section class="scoreboard-section" aria-labelledby="scoreboardTitle">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">MY SCOREBOARD</p>
+                <h2 id="scoreboardTitle">我的计分板</h2>
+              </div>
+              <span class="private-badge">仅本队可见</span>
+            </div>
+            <div class="stat-grid">
+              <article class="stat-card total"><span>已答题目</span><strong id="statAnswered">0</strong><small>QUESTIONS</small></article>
+              <article class="stat-card correct"><span>答对</span><strong id="statCorrect">0</strong><small>CORRECT</small></article>
+              <article class="stat-card wrong"><span>答错</span><strong id="statWrong">0</strong><small>WRONG</small></article>
+              <article class="stat-card score"><span>总得分</span><strong id="statScore">0</strong><small>POINTS</small></article>
+            </div>
+
+            <div class="history-card">
+              <div class="history-head"><h3>答题记录</h3><span id="historyCount">共0题</span></div>
+              <div id="historyList" class="history-list"></div>
+            </div>
+          </section>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <span>财务趣味竞赛 · 公平答题，独立计分</span>
+        <span class="footer-links">
+          <a href="/admin.html">题库管理</a>
+          <a class="icp-link" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">桂ICP备2026015627号</a>
+        </span>
+      </footer>
+    </div>
+
+    <div class="question-layer hidden" id="questionLayer" role="dialog" aria-modal="true" aria-labelledby="questionTitle">
+      <div class="question-backdrop" data-close-question></div>
+      <section class="question-panel">
+        <div class="question-topbar">
+          <div><span class="tier-tag" id="questionTier">1档题库</span><span id="questionProgress">准备答题</span></div>
+          <button class="close-button" type="button" aria-label="关闭题目" data-close-question>×</button>
+        </div>
+        <div class="question-content">
+          <p class="question-kicker">QUESTION</p>
+          <h2 id="questionTitle">题目加载中…</h2>
+          <div class="question-media hidden" id="questionMedia">
+            <img id="questionImage" alt="题目配图" />
+            <p id="questionImageError" class="hidden">图片加载失败，请联系管理员检查图片地址。</p>
+          </div>
+          <form id="answerForm" class="answer-form">
+            <p class="answer-hint" id="answerHint"></p>
+            <div id="answerOptions" class="answer-options"></div>
+            <button class="submit-answer" id="submitAnswer" type="submit" disabled>确认答案</button>
+          </form>
+          <div class="answer-result hidden" id="answerResult" aria-live="polite">
+            <div class="result-title" id="resultTitle"></div>
+            <p id="resultAnswer"></p>
+            <div class="explanation"><span>答案解析</span><p id="resultExplanation"></p></div>
+            <button class="primary-button" id="nextQuestionBtn" type="button">继续下一题 <span aria-hidden="true">→</span></button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="/quiz.js?v=20260805-2"></script>
+  </body>
+</html>
