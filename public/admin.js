@@ -207,11 +207,12 @@ function selectFile(file) {
 async function upload(event) {
   event.preventDefault();
   if (!selectedFile) return toast("请先选择 Excel 题库文件");
+  const form = event.currentTarget;
   const button = $("#uploadButton");
+  const mode = new FormData(form).get("mode");
   setBusy(button, true, "正在读取并导入…");
   try {
     const data = await toBase64(selectedFile);
-    const mode = new FormData(event.currentTarget).get("mode");
     const result = await api("/api/admin/import", {
       method: "POST",
       body: JSON.stringify({ filename: selectedFile.name, data, mode })
@@ -267,3 +268,4 @@ function toast(message) {
 function escapeHtml(value) {
   return String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]));
 }
+
