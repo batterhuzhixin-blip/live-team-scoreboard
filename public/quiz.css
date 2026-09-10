@@ -189,7 +189,7 @@ main { flex: 1; }
 .stat-card.score { background: var(--yellow); border-color: var(--yellow); }
 .stat-card.score span, .stat-card.score small { color: rgba(45,45,30,.65); }
 
-.history-card, .question-preview-card { margin-top: 18px; padding: 6px 24px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: rgba(255,254,250,.82); }
+.history-card { margin-top: 18px; padding: 6px 24px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: rgba(255,254,250,.82); }
 .history-head { min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--line); }
 .history-head h3, .history-head h2 { margin: 0; font-size: 17px; }
 .history-head span { color: var(--muted); font-size: 11px; }
@@ -306,14 +306,6 @@ main { flex: 1; }
 .import-mode span { display: grid; gap: 2px; }
 .import-mode b { font-size: 11px; }
 .import-mode small { color: var(--muted); font-size: 8px; }
-.question-preview-card { margin-top: 18px; }
-.question-preview article { min-height: 64px; display: grid; grid-template-columns: 35px minmax(0,1fr) auto; gap: 12px; align-items: center; border-bottom: 1px solid #e8e4da; }
-.question-preview article:last-child { border-bottom: 0; }
-.preview-index { color: #aaa9a2; font-size: 10px; font-weight: 800; }
-.question-preview article div { min-width: 0; display: grid; gap: 3px; }
-.question-preview strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
-.question-preview small { color: var(--muted); font-size: 9px; }
-.preview-tier { padding: 5px 8px; border-radius: 999px; font-size: 9px; font-weight: 800; }
 .tier-bg-1 { background: var(--yellow-soft); color: #74550d; }
 .tier-bg-2 { background: var(--green-soft); color: var(--green); }
 .tier-bg-3 { background: var(--orange-soft); color: #a14b29; }
@@ -431,7 +423,6 @@ main { flex: 1; }
   .admin-stat-grid strong { font-size: 26px; }
   .upload-card { padding: 20px; }
   .import-mode { grid-template-columns: 1fr; }
-  .question-preview-card { padding: 5px 14px 10px; }
   .team-management-card { padding: 5px 14px 14px; }
   .team-row { grid-template-columns: minmax(0,1fr) auto; padding: 10px 0; }
   .team-row .user-action { grid-column: 1/-1; justify-self: start; }
@@ -446,3 +437,4 @@ main { flex: 1; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; scroll-behavior: auto !important; transition-duration: .001ms !important; }
 }
+
