@@ -202,6 +202,7 @@ main { flex: 1; }
 .result-badge { padding: 6px 9px; border-radius: 999px; font-size: 10px; font-weight: 800; }
 .result-badge.is-correct { background: var(--green-soft); color: var(--green); }
 .result-badge.is-wrong { background: var(--red-soft); color: var(--red); }
+.result-badge.is-completed { background: var(--yellow-soft); color: #795a10; }
 .history-points { color: var(--muted); font-size: 20px; text-align: right; }
 .history-points.has-points { color: var(--green); }
 .history-points small { margin-left: 2px; font-size: 9px; }
@@ -234,6 +235,9 @@ main { flex: 1; }
 .question-media p { margin: 22px; color: var(--red); font-size: 13px; text-align: center; }
 .answer-hint { margin: -4px 0 -8px; color: var(--muted); font-size: 12px; font-weight: 700; }
 .answer-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.practical-instruction { grid-column: 1/-1; display: grid; gap: 6px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 15px; background: var(--white); }
+.practical-instruction strong { font-size: 14px; }
+.practical-instruction span { color: var(--muted); font-size: 12px; line-height: 1.7; }
 .answer-option { min-height: 76px; display: grid; grid-template-columns: 42px minmax(0,1fr) 24px; align-items: center; gap: 12px; padding: 12px 16px; border: 1.5px solid var(--line); border-radius: 15px; background: var(--white); cursor: pointer; transition: border .15s, background .15s, transform .15s; }
 .answer-option:hover { border-color: var(--green); transform: translateY(-1px); }
 .answer-option:has(input:checked) { border-color: var(--green); background: var(--green-soft); box-shadow: 0 0 0 3px rgba(47,122,98,.08); }
@@ -254,6 +258,7 @@ main { flex: 1; }
 .result-title strong { font-size: 24px; }
 .result-title b { margin-left: auto; color: var(--green); font-size: 26px; }
 .wrong-result .result-title b { color: var(--muted); }
+.completed-result .result-title b { color: var(--muted); font-size: 16px; }
 .answer-result > p { margin: 20px 0; color: var(--muted); }
 .explanation { margin: 24px 0; padding: 20px; border-left: 4px solid var(--yellow); border-radius: 0 14px 14px 0; background: var(--yellow-soft); }
 .explanation span { color: #72550f; font-size: 11px; font-weight: 900; }
