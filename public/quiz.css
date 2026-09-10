@@ -311,6 +311,13 @@ main { flex: 1; }
 .import-mode span { display: grid; gap: 2px; }
 .import-mode b { font-size: 11px; }
 .import-mode small { color: var(--muted); font-size: 8px; }
+.clear-library-panel { margin-top: 18px; padding-top: 16px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border-top: 1px solid var(--line); }
+.clear-library-panel > div { display: grid; gap: 4px; }
+.clear-library-panel strong { font-size: 11px; }
+.clear-library-panel small { color: var(--muted); font-size: 9px; line-height: 1.55; }
+.danger-button { flex: 0 0 auto; min-height: 38px; padding: 0 14px; border: 1px solid #d8a196; border-radius: 10px; background: #fff7f5; color: #a33b2d; cursor: pointer; font: inherit; font-size: 10px; font-weight: 800; transition: background .16s, border-color .16s, transform .16s; }
+.danger-button:hover { border-color: #a33b2d; background: #fce8e3; transform: translateY(-1px); }
+.danger-button:disabled { opacity: .48; cursor: not-allowed; transform: none; }
 .tier-bg-1 { background: var(--yellow-soft); color: #74550d; }
 .tier-bg-2 { background: var(--green-soft); color: var(--green); }
 .tier-bg-3 { background: var(--orange-soft); color: #a14b29; }
@@ -428,6 +435,8 @@ main { flex: 1; }
   .admin-stat-grid strong { font-size: 26px; }
   .upload-card { padding: 20px; }
   .import-mode { grid-template-columns: 1fr; }
+  .clear-library-panel { align-items: stretch; flex-direction: column; }
+  .danger-button { width: 100%; }
   .team-management-card { padding: 5px 14px 14px; }
   .team-row { grid-template-columns: minmax(0,1fr) auto; padding: 10px 0; }
   .team-row .user-action { grid-column: 1/-1; justify-self: start; }
