@@ -52,9 +52,11 @@ function makeQuestion(input) {
   const prompt = cleanText(input.prompt);
   const type = normalizeQuestionType(input.type) || "single";
   const optionSource = input.options || {};
-  const options = type === "judgment"
-    ? [{ key: "A", text: "正确" }, { key: "B", text: "错误" }]
-    : ["A", "B", "C", "D"].map((key) => ({ key, text: cleanText(optionSource[key]) })).filter((option) => option.text);
+  const options = type === "practical"
+    ? []
+    : type === "judgment"
+      ? [{ key: "A", text: "正确" }, { key: "B", text: "错误" }]
+      : ["A", "B", "C", "D"].map((key) => ({ key, text: cleanText(optionSource[key]) })).filter((option) => option.text);
   const correctAnswer = normalizeAnswer(input.correctAnswer, options, type);
   const fingerprint = `${tier}|${prompt}`;
   return {
@@ -65,7 +67,7 @@ function makeQuestion(input) {
     options,
     correctAnswer,
     imageUrl: cleanText(input.imageUrl),
-    explanation: cleanText(input.explanation) || "暂无解析",
+    explanation: cleanText(input.explanation) || (type === "practical" ? "本题由现场评委依据纸质材料另行评分。" : "暂无解析"),
     createdAt: input.createdAt || new Date().toISOString()
   };
 }
@@ -180,12 +182,14 @@ function normalizeQuestionType(value) {
     single: "single", singlechoice: "single", 单选: "single", 单选题: "single",
     multiple: "multiple", multiplechoice: "multiple", multi: "multiple", 多选: "multiple", 多选题: "multiple",
     judgment: "judgment", truefalse: "judgment", boolean: "judgment", 判断: "judgment", 判断题: "judgment",
-    imagecorrection: "image_correction", image: "image_correction", 看图纠错: "image_correction", 看图纠错题: "image_correction", 看图: "image_correction", 纠错: "image_correction"
+    practical: "practical", practicalquestion: "practical", 实操: "practical", 实操题: "practical",
+    imagecorrection: "practical", image: "practical", 看图纠错: "practical", 看图纠错题: "practical", 看图: "practical", 纠错: "practical"
   };
   return aliases[type] || "";
 }
 
 function normalizeAnswer(value, options, type) {
+  if (type === "practical") return "";
   const raw = Array.isArray(value) ? value.map(cleanText) : [cleanText(value)];
   const joined = raw.join(",").trim();
   if (!joined) return "";
@@ -207,6 +211,7 @@ function normalizeAnswer(value, options, type) {
 }
 
 function hasInvalidAnswer(value, options, type) {
+  if (type === "practical") return false;
   const joined = (Array.isArray(value) ? value.map(cleanText) : [cleanText(value)]).join(",").trim();
   if (!joined) return false;
   if (type === "judgment") return !normalizeAnswer(joined, options, type);
@@ -221,7 +226,7 @@ function questionType(question) {
 }
 
 function isMultiAnswerType(type) {
-  return type === "multiple" || type === "image_correction";
+  return type === "multiple";
 }
 
 function isValidImageUrl(value) {
@@ -383,7 +388,8 @@ function questionCounts() {
 function dashboardFor(user) {
   const attempts = state.attempts.filter((attempt) => attempt.userId === user.id);
   const byQuestion = new Map(state.questions.map((question) => [question.id, question]));
-  const correct = attempts.filter((attempt) => attempt.correct).length;
+  const correct = attempts.filter((attempt) => attempt.correct === true).length;
+  const wrong = attempts.filter((attempt) => attempt.correct === false).length;
   const score = attempts.reduce((sum, attempt) => sum + Number(attempt.points || 0), 0);
   const allowedTiers = allowedTiersFor(user);
   const tiers = questionCounts().filter(({ tier }) => allowedTiers.includes(tier)).map(({ tier, total }) => {
@@ -394,17 +400,17 @@ function dashboardFor(user) {
     id: attempt.id,
     questionId: attempt.questionId,
     prompt: attempt.prompt || byQuestion.get(attempt.questionId)?.prompt || "已下架题目",
-    type: attempt.type || questionType(byQuestion.get(attempt.questionId) || {}),
+    type: attempt.type ? questionType({ type: attempt.type }) : questionType(byQuestion.get(attempt.questionId) || {}),
     tier: attempt.tier,
     selectedAnswer: attempt.selectedAnswer,
     correctAnswer: attempt.correctAnswer,
-    correct: Boolean(attempt.correct),
+    correct: attempt.correct == null ? null : Boolean(attempt.correct),
     points: Number(attempt.points || 0),
     answeredAt: attempt.answeredAt
   }));
   return {
     user: publicUser(user),
-    summary: { answered: attempts.length, correct, wrong: attempts.length - correct, score },
+    summary: { answered: attempts.length, correct, wrong, score },
     tiers,
     history
   };
@@ -412,7 +418,8 @@ function dashboardFor(user) {
 
 function adminUserSummary(user) {
   const attempts = state.attempts.filter((attempt) => attempt.userId === user.id);
-  const correct = attempts.filter((attempt) => attempt.correct).length;
+  const correct = attempts.filter((attempt) => attempt.correct === true).length;
+  const wrong = attempts.filter((attempt) => attempt.correct === false).length;
   const score = attempts.reduce((sum, attempt) => sum + Number(attempt.points || 0), 0);
   const lastAnsweredAt = attempts.reduce((latest, attempt) => {
     const answeredAt = cleanText(attempt.answeredAt);
@@ -422,7 +429,7 @@ function adminUserSummary(user) {
     ...publicUser(user),
     answered: attempts.length,
     correct,
-    wrong: attempts.length - correct,
+    wrong,
     score,
     lastAnsweredAt: lastAnsweredAt || null
   };
@@ -488,22 +495,23 @@ async function parseWorkbook(buffer) {
       D: cleanText(normalizeHeader(row, ["选项D", "D", "optionD", "Option D"]))
     };
     if (type === "judgment") options = { A: "正确", B: "错误", C: "", D: "" };
+    if (type === "practical") options = { A: "", B: "", C: "", D: "" };
     const optionList = ["A", "B", "C", "D"].map((key) => ({ key, text: options[key] })).filter((option) => option.text);
     const rawAnswer = normalizeHeader(row, ["正确答案", "答案", "answer", "Answer"]);
     const correctAnswer = normalizeAnswer(rawAnswer, optionList, type);
     const imageUrl = cleanText(normalizeHeader(row, ["图片地址", "图片链接", "图片URL", "imageUrl", "Image URL"]));
     const explanation = cleanText(normalizeHeader(row, ["解析", "答案解析", "explanation", "Explanation"]));
     const missing = [];
-    if (!type) missing.push("题型必须是单选、多选、判断或看图纠错");
+    if (!type) missing.push("题型必须是单选、多选、判断或实操题");
     if (![1, 2, 3].includes(tier)) missing.push("档位必须是1、2或3");
     if (!prompt) missing.push("题目不能为空");
-    if (type !== "judgment" && optionList.length < 2) missing.push("至少填写选项A和B");
-    if (type !== "judgment" && optionList.some((option, optionIndex) => option.key !== String.fromCharCode(65 + optionIndex))) missing.push("选项须从A开始连续填写，不能跳列");
+    if (type !== "judgment" && type !== "practical" && optionList.length < 2) missing.push("至少填写选项A和B");
+    if (type !== "judgment" && type !== "practical" && optionList.some((option, optionIndex) => option.key !== String.fromCharCode(65 + optionIndex))) missing.push("选项须从A开始连续填写，不能跳列");
     if (type === "multiple" && correctAnswer.split(",").filter(Boolean).length < 2) missing.push("多选题的正确答案至少包含两项，如A,C");
-    if (type && type !== "multiple" && type !== "image_correction" && correctAnswer.split(",").filter(Boolean).length !== 1) missing.push("该题型只能有一个正确答案");
+    if (type && type !== "multiple" && type !== "practical" && correctAnswer.split(",").filter(Boolean).length !== 1) missing.push("该题型只能有一个正确答案");
     if (hasInvalidAnswer(rawAnswer, optionList, type)) missing.push("正确答案中包含不存在的选项");
-    if (type === "image_correction" && !isValidImageUrl(imageUrl)) missing.push("看图纠错题必须填写有效的http(s)图片地址或以/开头的站内路径");
-    if (!correctAnswer) missing.push(type === "judgment" ? "判断题答案请填写正确或错误" : "正确答案须使用选项字母，如A或A,C");
+    if (type === "practical" && !isValidImageUrl(imageUrl)) missing.push("实操题必须填写有效的http(s)图片地址或以/开头的站内路径");
+    if (type !== "practical" && !correctAnswer) missing.push(type === "judgment" ? "判断题答案请填写正确或错误" : "正确答案须使用选项字母，如A或A,C");
     if (missing.length) {
       errors.push(`第${rowNo}行：${missing.join("；")}`);
       return;
@@ -562,17 +570,17 @@ async function buildTemplate() {
     { 题型: "单选", 档位: 1, 题目: "资产负债表反映企业什么时点的财务状况？", 图片地址: "", 选项A: "某一特定日期", 选项B: "某一会计期间", 选项C: "未来三年", 选项D: "任意日期", 正确答案: "A", 解析: "资产负债表反映企业在某一特定日期的财务状况。" },
     { 题型: "多选", 档位: 2, 题目: "下列哪些属于财务报表？", 图片地址: "", 选项A: "资产负债表", 选项B: "利润表", 选项C: "现金流量表", 选项D: "考勤表", 正确答案: "A,B,C", 解析: "前三项属于企业财务报表。" },
     { 题型: "判断", 档位: 1, 题目: "判断题无需填写选项A至D。", 图片地址: "", 选项A: "", 选项B: "", 选项C: "", 选项D: "", 正确答案: "正确", 解析: "判断题答案填写“正确”或“错误”。" },
-    { 题型: "看图纠错", 档位: 3, 题目: "观察图片，选择其中存在的错误（可多选）。", 图片地址: "/og.png", 选项A: "错误点一", 选项B: "错误点二", 选项C: "错误点三", 选项D: "以上均无错误", 正确答案: "A,C", 解析: "请替换为真实图片地址、选项和解析。" }
+    { 题型: "实操题", 档位: 3, 题目: "实操题A", 图片地址: "/og.png", 选项A: "", 选项B: "", 选项C: "", 选项D: "", 正确答案: "", 解析: "请替换为实操题图片地址；纸质材料和现场评分规则另行准备。" }
   ];
   const headers = ["题型", "档位", "题目", "图片地址", "选项A", "选项B", "选项C", "选项D", "正确答案", "解析"];
   const table = [headers, ...rows.map((row) => headers.map((header) => row[header]))];
   const notes = [
     ["项目", "填写规则"],
-    ["题型", "填写：单选、多选、判断、看图纠错。留空时按单选导入，以兼容旧模板。"],
-    ["档位", "只能填写1、2或3，对应答对得分。"],
-    ["选项", "单选、多选、看图纠错至少连续填写A、B；C、D可留空。判断题的选项留空。"],
-    ["正确答案", "单选填一个字母；多选用英文逗号分隔，如A,C；判断填正确或错误；看图纠错可填一个或多个字母。"],
-    ["图片地址", "仅看图纠错必填。填写浏览器能直接访问的http(s)图片链接，或网站public目录下以/开头的路径。"],
+    ["题型", "填写：单选、多选、判断、实操题。留空时按单选导入，以兼容旧模板。"],
+    ["档位", "只能填写1、2或3。单选、多选和判断题答对后按档位得分；实操题只记录完成，不自动计分。"],
+    ["选项", "单选、多选至少连续填写A、B；C、D可留空。判断题和实操题的选项全部留空。"],
+    ["正确答案", "单选填一个字母；多选用英文逗号分隔，如A,C；判断填正确或错误；实操题留空。"],
+    ["图片地址", "实操题必填。填写浏览器能直接访问的http(s)图片链接，或网站public目录下以/开头的路径。其他题型可按需填写。"],
     ["导入提示", "示例行请修改或删除后再正式导入。系统会逐行校验并提示问题所在行。"]
   ];
   const buildSheetXml = (sheetTable, widths, filter) => {
@@ -710,13 +718,41 @@ async function handleApi(req, res, url) {
     if (!question) return json(res, 404, { error: "该题目不存在或已下架" });
     if (!allowedTiersFor(user).includes(question.tier)) return json(res, 403, { error: `${routeLabel(user.route)}不能回答${question.tier}档题目` });
     const type = questionType(question);
+    if (state.attempts.some((attempt) => attempt.userId === user.id && attempt.questionId === question.id)) return json(res, 409, { error: "这道题你已经回答过了" });
+    if (type === "practical") {
+      if (body.completed !== true) return json(res, 400, { error: "完成实操后请点击“回答完毕”" });
+      const attempt = {
+        id: `a_${crypto.randomUUID()}`,
+        userId: user.id,
+        questionId: question.id,
+        prompt: question.prompt,
+        type,
+        tier: question.tier,
+        selectedAnswer: "",
+        correctAnswer: "",
+        correct: null,
+        points: 0,
+        completed: true,
+        answeredAt: new Date().toISOString()
+      };
+      state.attempts.push(attempt);
+      saveState();
+      return json(res, 200, {
+        completed: true,
+        correct: null,
+        points: 0,
+        selectedAnswer: "",
+        correctAnswer: "",
+        explanation: question.explanation,
+        dashboard: dashboardFor(user)
+      });
+    }
     const options = Array.isArray(question.options) ? question.options : [];
     if (hasInvalidAnswer(body.answer, options, type)) return json(res, 400, { error: "答案中包含无效选项" });
     const selectedAnswer = normalizeAnswer(body.answer, options, type);
     const selectedKeys = selectedAnswer.split(",").filter(Boolean);
     if (!selectedKeys.length) return json(res, 400, { error: "请至少选择一个答案" });
     if (!isMultiAnswerType(type) && selectedKeys.length !== 1) return json(res, 400, { error: "这道题只能选择一个答案" });
-    if (state.attempts.some((attempt) => attempt.userId === user.id && attempt.questionId === question.id)) return json(res, 409, { error: "这道题你已经回答过了" });
     const correctAnswer = normalizeAnswer(question.correctAnswer, options, type);
     const correct = selectedAnswer === correctAnswer;
     const attempt = {
@@ -951,3 +987,4 @@ server.listen(PORT, HOST, () => {
   console.log(`财趣题库已启动：http://localhost:${PORT}`);
   if (!process.env.ADMIN_PASSWORD) console.warn("当前使用默认管理密码 admin123，正式比赛前请设置 ADMIN_PASSWORD 环境变量。");
 });
+
