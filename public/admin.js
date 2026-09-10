@@ -1,6 +1,7 @@
 const $ = (selector) => document.querySelector(selector);
 let selectedFile = null;
 let toastTimer;
+let currentQuestionTotal = 0;
 
 document.addEventListener("DOMContentLoaded", init);
 
@@ -18,6 +19,7 @@ function bindEvents() {
   $("#adminLogoutBtn").addEventListener("click", logout);
   $("#quizFile").addEventListener("change", (event) => selectFile(event.target.files[0]));
   $("#uploadForm").addEventListener("submit", upload);
+  $("#clearQuestionsButton").addEventListener("click", clearQuestions);
   $("#teamImportForm").addEventListener("submit", importTeams);
   $("#teamList").addEventListener("click", manageTeam);
   $("#userList").addEventListener("click", manageUser);
@@ -67,6 +69,7 @@ async function loadDashboard() {
 }
 
 function renderStats(stats) {
+  currentQuestionTotal = Number(stats.questions || 0);
   const tierMap = Object.fromEntries(stats.tiers.map((item) => [item.tier, item.total]));
   $("#adminStats").innerHTML = `
     <article><span>题目总数</span><strong>${stats.questions}</strong><small>道共享题目</small></article>
@@ -209,6 +212,24 @@ async function upload(event) {
     $("#fileName").textContent = "点击选择或拖入 Excel 文件";
     $("#fileMeta").textContent = "尚未选择文件";
     $("#dropZone").classList.remove("has-file");
+    await loadDashboard();
+  } catch (error) {
+    toast(error.message);
+  } finally {
+    setBusy(button, false);
+  }
+}
+
+async function clearQuestions() {
+  const button = $("#clearQuestionsButton");
+  if (!currentQuestionTotal) return toast("当前题库已经是空的");
+  const confirmed = window.confirm(`确定清空当前题库中的 ${currentQuestionTotal} 道题吗？\n\n用户、队伍和答题记录会保留，但全部题目将被永久删除。`);
+  if (!confirmed) return;
+  if (!window.confirm("请再次确认：清空题库后无法恢复，是否继续？")) return;
+  setBusy(button, true, "正在清空…");
+  try {
+    const result = await api("/api/admin/questions", { method: "DELETE" });
+    toast(result.message);
     await loadDashboard();
   } catch (error) {
     toast(error.message);
