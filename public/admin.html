@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#123b33" />
     <title>题库管理｜财趣答题赛</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/quiz.css?v=20260910-2" />
+    <link rel="stylesheet" href="/quiz.css?v=20260910-3" />
   </head>
   <body class="admin-body">
     <div class="app-shell">
@@ -64,6 +64,10 @@
                 </fieldset>
                 <button class="primary-button" id="uploadButton" type="submit">开始导入 <span aria-hidden="true">→</span></button>
               </form>
+              <div class="clear-library-panel">
+                <div><strong>清空当前题库</strong><small>仅删除全部题目，用户、队伍和答题记录都会保留。</small></div>
+                <button class="danger-button" id="clearQuestionsButton" type="button">清空全部题目</button>
+              </div>
             </section>
           </div>
           <section class="user-management-card">
@@ -81,7 +85,7 @@
       </footer>
     </div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="/admin.js?v=20260910-1"></script>
+    <script src="/admin.js?v=20260910-2"></script>
   </body>
 </html>
 
