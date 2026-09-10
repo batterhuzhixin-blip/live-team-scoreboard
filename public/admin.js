@@ -142,6 +142,7 @@ function renderUsers(users) {
     <strong class="user-score">${user.score}<small>分</small></strong>
     <div class="user-actions">
       <button class="user-action reset-user" type="button" data-action="reset" data-user-id="${escapeHtml(user.id)}" data-team-name="${escapeHtml(user.teamName)}">重置答题</button>
+      <button class="user-action reset-password-user" type="button" data-action="password" data-user-id="${escapeHtml(user.id)}" data-team-name="${escapeHtml(user.teamName)}">重置密码</button>
       <button class="user-action delete-user" type="button" data-action="delete" data-user-id="${escapeHtml(user.id)}" data-team-name="${escapeHtml(user.teamName)}">删除用户</button>
     </div>
   </article>`).join("")}`;
@@ -152,13 +153,17 @@ async function manageUser(event) {
   if (!button) return;
   const { action, userId, teamName } = button.dataset;
   const deleting = action === "delete";
+  const resettingPassword = action === "password";
   const confirmed = window.confirm(deleting
     ? `确定删除“${teamName}”吗？\n\n账号和全部答题记录将永久删除，且无法恢复。`
-    : `确定重置“${teamName}”的答题记录吗？\n\n账号会保留，已答题目、对错和得分将清零。`);
+    : resettingPassword
+      ? `确定将“${teamName}”的账号密码重置为 123456 吗？\n\n该账号会被退出登录，答题记录和得分保持不变。`
+      : `确定重置“${teamName}”的答题记录吗？\n\n账号会保留，已答题目、对错和得分将清零。`);
   if (!confirmed) return;
-  setBusy(button, true, deleting ? "删除中…" : "重置中…");
+  setBusy(button, true, deleting ? "删除中…" : resettingPassword ? "处理中…" : "重置中…");
   try {
-    const result = await api(`/api/admin/users/${encodeURIComponent(userId)}${deleting ? "" : "/reset"}`, {
+    const suffix = deleting ? "" : resettingPassword ? "/password/reset" : "/reset";
+    const result = await api(`/api/admin/users/${encodeURIComponent(userId)}${suffix}`, {
       method: deleting ? "DELETE" : "POST"
     });
     toast(result.message);
