@@ -12,6 +12,7 @@ const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(ROOT, "data"));
 const STATE_FILE = path.join(DATA_DIR, "quiz-state.json");
 const ADMIN_PASSWORD = String(process.env.ADMIN_PASSWORD || "admin123");
 const SESSION_AGE_MS = 24 * 60 * 60 * 1000;
+const RESET_USER_PASSWORD = "123456";
 const sessions = new Map();
 const adminSessions = new Map();
 const authFailures = new Map();
@@ -815,6 +816,23 @@ async function handleApi(req, res, url) {
     return json(res, 200, {
       message: `已重置“${user.teamName}”的答题记录`,
       removedAttempts: before - state.attempts.length,
+      user: adminUserSummary(user)
+    });
+  }
+  const resetPasswordMatch = req.method === "POST" && url.pathname.match(/^\/api\/admin\/users\/([^/]+)\/password\/reset$/);
+  if (resetPasswordMatch) {
+    if (!requireAdmin(req, res)) return;
+    const userId = decodeURIComponent(resetPasswordMatch[1]);
+    const user = state.users.find((item) => item.id === userId);
+    if (!user) return json(res, 404, { error: "用户不存在或已被删除" });
+    const password = hashPassword(RESET_USER_PASSWORD);
+    user.passwordSalt = password.salt;
+    user.passwordHash = password.hash;
+    invalidateUserSessions(userId);
+    saveState();
+    return json(res, 200, {
+      message: `已将“${user.teamName}”的密码重置为${RESET_USER_PASSWORD}`,
+      initialPassword: RESET_USER_PASSWORD,
       user: adminUserSummary(user)
     });
   }
