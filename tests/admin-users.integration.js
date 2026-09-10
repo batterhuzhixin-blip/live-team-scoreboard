@@ -4,6 +4,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
+const { unzipSync, strFromU8 } = require("fflate");
 
 const root = path.resolve(__dirname, "..");
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "finance-quiz-admin-users-"));
@@ -23,7 +24,7 @@ fs.writeFileSync(path.join(dataDir, "quiz-state.json"), JSON.stringify({
     passwordHash: crypto.scryptSync("test123456", salt, 64).toString("hex"),
     createdAt: now
   }],
-  questions: [1, 2, 3].map((tier) => ({
+  questions: [...[1, 2, 3].map((tier) => ({
     id: `q_tier_${tier}`,
     tier,
     type: "single",
@@ -32,7 +33,17 @@ fs.writeFileSync(path.join(dataDir, "quiz-state.json"), JSON.stringify({
     correctAnswer: "A",
     explanation: "测试解析",
     createdAt: now
-  })),
+  })), {
+    id: "q_practical",
+    tier: 2,
+    type: "practical",
+    prompt: "实操题A",
+    imageUrl: "/og.png",
+    options: [],
+    correctAnswer: "",
+    explanation: "线下评分",
+    createdAt: now
+  }],
   attempts: [{
     id: "a_admin_user_test",
     userId,
@@ -138,6 +149,25 @@ async function waitForServer() {
 
     const routeADashboard = (await request("/api/quiz/dashboard", {}, registered.cookie)).body;
     assert.deepStrictEqual(routeADashboard.tiers.map((item) => item.tier), [1, 2]);
+    const incompletePractical = await fetch(`${origin}/api/quiz/answer`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: registered.cookie },
+      body: JSON.stringify({ questionId: "q_practical" })
+    });
+    assert.strictEqual(incompletePractical.status, 400);
+    const practicalResult = (await request("/api/quiz/answer", {
+      method: "POST",
+      body: JSON.stringify({ questionId: "q_practical", completed: true })
+    }, registered.cookie)).body;
+    assert.strictEqual(practicalResult.completed, true);
+    assert.strictEqual(practicalResult.correct, null);
+    assert.strictEqual(practicalResult.points, 0);
+    assert.deepStrictEqual(
+      practicalResult.dashboard.summary,
+      { answered: 1, correct: 0, wrong: 0, score: 0 }
+    );
+    assert.strictEqual(practicalResult.dashboard.history[0].type, "practical");
+    assert.strictEqual(practicalResult.dashboard.history[0].correct, null);
     const routeAForbiddenNext = await fetch(`${origin}/api/quiz/next?tier=3`, { headers: { Cookie: registered.cookie } });
     assert.strictEqual(routeAForbiddenNext.status, 403);
     const routeAForbiddenAnswer = await fetch(`${origin}/api/quiz/answer`, {
@@ -177,6 +207,19 @@ async function waitForServer() {
     const routeBAllowed = await fetch(`${origin}/api/quiz/next?tier=3`, { headers: { Cookie: routeBRegistered.cookie } });
     assert.strictEqual(routeBAllowed.status, 200);
 
+    const templateResponse = await fetch(`${origin}/api/admin/template`, { headers: { Cookie: adminCookie } });
+    assert.strictEqual(templateResponse.status, 200);
+    const templateBytes = new Uint8Array(await templateResponse.arrayBuffer());
+    const templateFiles = unzipSync(templateBytes);
+    const templateText = `${strFromU8(templateFiles["xl/worksheets/sheet1.xml"])}\n${strFromU8(templateFiles["xl/worksheets/sheet2.xml"])}`;
+    assert.match(templateText, /实操题/);
+    assert.doesNotMatch(templateText, /看图纠错/);
+    const importedTemplate = (await request("/api/admin/import", {
+      method: "POST",
+      body: JSON.stringify({ filename: "题库导入模板.xlsx", data: Buffer.from(templateBytes).toString("base64"), mode: "append" })
+    }, adminCookie)).body;
+    assert.strictEqual(importedTemplate.imported, 4);
+
     const unclaimedTeam = availableAfterClaim.find((team) => team.name === "乘风破浪队");
     const removedTeam = (await request(`/api/admin/teams/${encodeURIComponent(unclaimedTeam.id)}`, { method: "DELETE" }, adminCookie)).body;
     assert.match(removedTeam.message, /乘风破浪队/);
@@ -191,3 +234,4 @@ async function waitForServer() {
   console.error(error);
   process.exitCode = 1;
 });
+
