@@ -1,7 +1,6 @@
 const $ = (selector) => document.querySelector(selector);
 let selectedFile = null;
 let toastTimer;
-const QUESTION_TYPES = { single: "单选", multiple: "多选", judgment: "判断", image_correction: "看图纠错" };
 
 document.addEventListener("DOMContentLoaded", init);
 
@@ -65,7 +64,6 @@ async function loadDashboard() {
   renderStats(data.stats);
   renderTeams(data.teams || []);
   renderUsers(data.users || []);
-  renderQuestions(data.questions);
 }
 
 function renderStats(stats) {
@@ -124,18 +122,6 @@ async function manageTeam(event) {
     toast(error.message);
     setBusy(button, false);
   }
-}
-
-function renderQuestions(questions) {
-  if (!questions.length) {
-    $("#questionPreview").innerHTML = `<p class="admin-empty">当前题库为空，请上传 Excel 文件。</p>`;
-    return;
-  }
-  $("#questionPreview").innerHTML = questions.map((question, index) => `<article>
-    <span class="preview-index">${String(index + 1).padStart(2, "0")}</span>
-    <div><strong>${escapeHtml(question.prompt)}</strong><small>${QUESTION_TYPES[question.type] || "单选"} · ${question.tier}档 · 正确答案 ${String(question.correctAnswer).replaceAll(",", "、")}</small></div>
-    <span class="preview-tier tier-bg-${question.tier}">${question.tier}档</span>
-  </article>`).join("");
 }
 
 function renderUsers(users) {
