@@ -1,5 +1,5 @@
 const state = { dashboard: null, availableTeams: [], tier: null, question: null, selected: null, answering: false };
-const QUESTION_TYPES = { single: "单选", multiple: "多选", judgment: "判断", image_correction: "看图纠错" };
+const QUESTION_TYPES = { single: "单选", multiple: "多选", judgment: "判断", practical: "实操题" };
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
@@ -174,12 +174,19 @@ function renderHistory(history) {
     $("#historyList").innerHTML = `<div class="empty-history"><span>答</span><p>还没有答题记录<br /><small>选择上方任意答题包开始挑战吧</small></p></div>`;
     return;
   }
-  $("#historyList").innerHTML = history.map((item, index) => `<article class="history-row">
-    <span class="history-index">${String(history.length - index).padStart(2, "0")}</span>
-    <div class="history-question"><strong>${escapeHtml(item.prompt)}</strong><small>${QUESTION_TYPES[item.type] || "单选"} · ${item.tier}档 · 选择 ${formatAnswerKeys(item.selectedAnswer)} · ${formatTime(item.answeredAt)}</small></div>
-    <span class="result-badge ${item.correct ? "is-correct" : "is-wrong"}">${item.correct ? "答对" : "答错"}</span>
-    <b class="history-points ${item.correct ? "has-points" : ""}">${item.correct ? `+${item.points}` : "0"}<small>分</small></b>
-  </article>`).join("");
+  $("#historyList").innerHTML = history.map((item, index) => {
+    const completed = item.correct == null;
+    const detail = completed ? "线下作答已完成" : `选择 ${formatAnswerKeys(item.selectedAnswer)}`;
+    const badgeClass = completed ? "is-completed" : item.correct ? "is-correct" : "is-wrong";
+    const badgeText = completed ? "已完成" : item.correct ? "答对" : "答错";
+    const points = completed ? "—" : item.correct ? `+${item.points}<small>分</small>` : "0<small>分</small>";
+    return `<article class="history-row">
+      <span class="history-index">${String(history.length - index).padStart(2, "0")}</span>
+      <div class="history-question"><strong>${escapeHtml(item.prompt)}</strong><small>${QUESTION_TYPES[item.type] || "单选"} · ${item.tier}档 · ${detail} · ${formatTime(item.answeredAt)}</small></div>
+      <span class="result-badge ${badgeClass}">${badgeText}</span>
+      <b class="history-points ${item.correct ? "has-points" : ""}">${points}</b>
+    </article>`;
+  }).join("");
 }
 
 async function openTier(tier) {
@@ -207,16 +214,26 @@ async function loadNextQuestion() {
     }
     state.question = data.question;
     const typeLabel = QUESTION_TYPES[data.question.type] || "单选";
-    const multiAnswer = data.question.type === "multiple" || data.question.type === "image_correction";
-    $("#questionTier").textContent = `${typeLabel} · ${data.question.tier}档 · 答对 +${data.question.tier}分`;
+    const practical = data.question.type === "practical";
+    const multiAnswer = data.question.type === "multiple";
+    $("#questionTier").textContent = practical
+      ? `${typeLabel} · ${data.question.tier}档 · 线下评分`
+      : `${typeLabel} · ${data.question.tier}档 · 答对 +${data.question.tier}分`;
     $("#questionProgress").textContent = `本档剩余 ${data.remaining} 题`;
     $("#questionTitle").textContent = data.question.prompt;
-    $("#answerHint").textContent = multiAnswer ? "可选择多个答案，选全且无错选才得分" : data.question.type === "judgment" ? "请选择“正确”或“错误”" : "请选择一个答案";
+    $("#answerHint").textContent = practical ? "请按线下纸质材料完成实操，完成后点击“回答完毕”" : multiAnswer ? "可选择多个答案，选全且无错选才得分" : data.question.type === "judgment" ? "请选择“正确”或“错误”" : "请选择一个答案";
     renderQuestionImage(data.question);
-    $("#answerOptions").innerHTML = data.question.options.map((option) => `<label class="answer-option">
-      <input type="${multiAnswer ? "checkbox" : "radio"}" name="answer" value="${option.key}" />
-      <span class="option-letter">${option.key}</span><span class="option-text">${escapeHtml(option.text)}</span><span class="option-check" aria-hidden="true">✓</span>
-    </label>`).join("");
+    $("#answerOptions").innerHTML = practical
+      ? `<div class="practical-instruction"><strong>线下完成本题</strong><span>本页面不设置答案选项，现场作答完成后即可提交。</span></div>`
+      : data.question.options.map((option) => `<label class="answer-option">
+        <input type="${multiAnswer ? "checkbox" : "radio"}" name="answer" value="${option.key}" />
+        <span class="option-letter">${option.key}</span><span class="option-text">${escapeHtml(option.text)}</span><span class="option-check" aria-hidden="true">✓</span>
+      </label>`).join("");
+    const submitButton = $("#submitAnswer");
+    submitButton.textContent = practical ? "回答完毕" : "确认答案";
+    submitButton.dataset.defaultText = submitButton.textContent;
+    submitButton.disabled = !practical;
+    state.selected = practical ? "completed" : null;
   } catch (error) {
     if (error.status === 401) { showAuth(); closeQuestion(); }
     toast(error.message);
@@ -234,7 +251,10 @@ function resetQuestionView() {
   $("#questionImageError").classList.add("hidden");
   $("#questionImage").removeAttribute("src");
   $("#answerOptions").innerHTML = `<div class="question-loading"><i></i><i></i><i></i></div>`;
-  $("#submitAnswer").disabled = true;
+  const submitButton = $("#submitAnswer");
+  delete submitButton.dataset.defaultText;
+  submitButton.textContent = "确认答案";
+  submitButton.disabled = true;
 }
 
 function onAnswerSelect(event) {
@@ -264,14 +284,17 @@ function renderQuestionImage(question) {
 
 async function submitAnswer(event) {
   event.preventDefault();
-  if (!state.question || !state.selected || state.answering) return;
+  const practical = state.question?.type === "practical";
+  if (!state.question || (!practical && !state.selected) || state.answering) return;
   state.answering = true;
   const button = $("#submitAnswer");
   setBusy(button, true, "提交中…");
   try {
     const result = await api("/api/quiz/answer", {
       method: "POST",
-      body: JSON.stringify({ questionId: state.question.id, answer: state.selected })
+      body: JSON.stringify(practical
+        ? { questionId: state.question.id, completed: true }
+        : { questionId: state.question.id, answer: state.selected })
     });
     state.dashboard = result.dashboard;
     renderDashboard();
@@ -286,8 +309,17 @@ async function submitAnswer(event) {
 function showResult(result) {
   $("#answerForm").classList.add("hidden");
   $("#answerResult").classList.remove("hidden");
-  $("#answerResult").classList.toggle("correct-result", result.correct);
-  $("#answerResult").classList.toggle("wrong-result", !result.correct);
+  $("#answerResult").classList.toggle("completed-result", Boolean(result.completed));
+  $("#answerResult").classList.toggle("correct-result", result.correct === true);
+  $("#answerResult").classList.toggle("wrong-result", result.correct === false);
+  const explanation = $("#resultExplanation").closest(".explanation");
+  if (result.completed) {
+    $("#resultTitle").innerHTML = `<span>✓</span><strong>实操已完成</strong><b>线下评分</b>`;
+    $("#resultAnswer").textContent = "已记录完成，可以继续抽取其他题目。";
+    explanation.classList.add("hidden");
+    return;
+  }
+  explanation.classList.remove("hidden");
   $("#resultTitle").innerHTML = result.correct ? `<span>✓</span><strong>回答正确</strong><b>+${result.points}分</b>` : `<span>×</span><strong>回答错误</strong><b>+0分</b>`;
   const selectedText = formatCurrentAnswer(result.selectedAnswer);
   const correctText = formatCurrentAnswer(result.correctAnswer);
@@ -343,3 +375,4 @@ function formatCurrentAnswer(value) {
   const optionMap = Object.fromEntries((state.question?.options || []).map((option) => [option.key, option.text]));
   return String(value || "").split(",").filter(Boolean).map((key) => `${key}.${optionMap[key] || key}`).join("、") || "—";
 }
+
