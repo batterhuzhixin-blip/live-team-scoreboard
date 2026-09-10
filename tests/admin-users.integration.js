@@ -179,6 +179,30 @@ async function waitForServer() {
     const routeAAllowed = await fetch(`${origin}/api/quiz/next?tier=1`, { headers: { Cookie: registered.cookie } });
     assert.strictEqual(routeAAllowed.status, 200);
 
+    const unauthorizedPasswordReset = await fetch(`${origin}/api/admin/users/${encodeURIComponent(registered.body.user.id)}/password/reset`, { method: "POST" });
+    assert.strictEqual(unauthorizedPasswordReset.status, 401);
+    const beforePasswordReset = (await request("/api/admin/status", {}, adminCookie)).body.users.find((user) => user.id === registered.body.user.id);
+    const resetPassword = (await request(`/api/admin/users/${encodeURIComponent(registered.body.user.id)}/password/reset`, { method: "POST" }, adminCookie)).body;
+    assert.strictEqual(resetPassword.initialPassword, "123456");
+    const invalidatedSession = (await request("/api/auth/me", {}, registered.cookie)).body;
+    assert.strictEqual(invalidatedSession.authenticated, false);
+    const oldPasswordLogin = await fetch(`${origin}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: "finance_team", password: "test123456" })
+    });
+    assert.strictEqual(oldPasswordLogin.status, 401);
+    const newPasswordLogin = await request("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ username: "finance_team", password: "123456" })
+    });
+    assert.strictEqual(newPasswordLogin.body.user.route, "A");
+    const afterPasswordReset = (await request("/api/admin/status", {}, adminCookie)).body.users.find((user) => user.id === registered.body.user.id);
+    assert.deepStrictEqual(
+      { answered: afterPasswordReset.answered, correct: afterPasswordReset.correct, wrong: afterPasswordReset.wrong, score: afterPasswordReset.score },
+      { answered: beforePasswordReset.answered, correct: beforePasswordReset.correct, wrong: beforePasswordReset.wrong, score: beforePasswordReset.score }
+    );
+
     const duplicateResponse = await fetch(`${origin}/api/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -237,7 +261,7 @@ async function waitForServer() {
     assert.strictEqual(afterClear.stats.attempts, beforeClear.stats.attempts);
     assert.strictEqual(afterClear.stats.users, beforeClear.stats.users);
 
-    console.log("队伍导入、唯一引用、A/B路线权限、用户重置删除、题库清空及会话失效测试通过");
+    console.log("队伍导入、唯一引用、A/B路线权限、用户答题与密码重置、题库清空及会话失效测试通过");
   } finally {
     server.kill();
     await new Promise((resolve) => server.once("exit", resolve));
