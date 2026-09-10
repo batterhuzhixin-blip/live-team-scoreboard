@@ -229,17 +229,6 @@ function isMultiAnswerType(type) {
   return type === "multiple";
 }
 
-function isValidImageUrl(value) {
-  const url = cleanText(value);
-  if (!url) return false;
-  if (url.startsWith("/") && !url.startsWith("//")) return true;
-  try {
-    return ["http:", "https:"].includes(new URL(url).protocol);
-  } catch {
-    return false;
-  }
-}
-
 function json(res, status, body, headers = {}) {
   const payload = JSON.stringify(body);
   res.writeHead(status, {
@@ -510,7 +499,6 @@ async function parseWorkbook(buffer) {
     if (type === "multiple" && correctAnswer.split(",").filter(Boolean).length < 2) missing.push("多选题的正确答案至少包含两项，如A,C");
     if (type && type !== "multiple" && type !== "practical" && correctAnswer.split(",").filter(Boolean).length !== 1) missing.push("该题型只能有一个正确答案");
     if (hasInvalidAnswer(rawAnswer, optionList, type)) missing.push("正确答案中包含不存在的选项");
-    if (type === "practical" && !isValidImageUrl(imageUrl)) missing.push("实操题必须填写有效的http(s)图片地址或以/开头的站内路径");
     if (type !== "practical" && !correctAnswer) missing.push(type === "judgment" ? "判断题答案请填写正确或错误" : "正确答案须使用选项字母，如A或A,C");
     if (missing.length) {
       errors.push(`第${rowNo}行：${missing.join("；")}`);
@@ -570,7 +558,7 @@ async function buildTemplate() {
     { 题型: "单选", 档位: 1, 题目: "资产负债表反映企业什么时点的财务状况？", 图片地址: "", 选项A: "某一特定日期", 选项B: "某一会计期间", 选项C: "未来三年", 选项D: "任意日期", 正确答案: "A", 解析: "资产负债表反映企业在某一特定日期的财务状况。" },
     { 题型: "多选", 档位: 2, 题目: "下列哪些属于财务报表？", 图片地址: "", 选项A: "资产负债表", 选项B: "利润表", 选项C: "现金流量表", 选项D: "考勤表", 正确答案: "A,B,C", 解析: "前三项属于企业财务报表。" },
     { 题型: "判断", 档位: 1, 题目: "判断题无需填写选项A至D。", 图片地址: "", 选项A: "", 选项B: "", 选项C: "", 选项D: "", 正确答案: "正确", 解析: "判断题答案填写“正确”或“错误”。" },
-    { 题型: "实操题", 档位: 3, 题目: "实操题A", 图片地址: "/og.png", 选项A: "", 选项B: "", 选项C: "", 选项D: "", 正确答案: "", 解析: "请替换为实操题图片地址；纸质材料和现场评分规则另行准备。" }
+    { 题型: "实操题", 档位: 3, 题目: "实操题A", 图片地址: "", 选项A: "", 选项B: "", 选项C: "", 选项D: "", 正确答案: "", 解析: "只需填写题型、档位和题目；纸质材料和现场评分规则另行准备。" }
   ];
   const headers = ["题型", "档位", "题目", "图片地址", "选项A", "选项B", "选项C", "选项D", "正确答案", "解析"];
   const table = [headers, ...rows.map((row) => headers.map((header) => row[header]))];
@@ -580,7 +568,7 @@ async function buildTemplate() {
     ["档位", "只能填写1、2或3。单选、多选和判断题答对后按档位得分；实操题只记录完成，不自动计分。"],
     ["选项", "单选、多选至少连续填写A、B；C、D可留空。判断题和实操题的选项全部留空。"],
     ["正确答案", "单选填一个字母；多选用英文逗号分隔，如A,C；判断填正确或错误；实操题留空。"],
-    ["图片地址", "实操题必填。填写浏览器能直接访问的http(s)图片链接，或网站public目录下以/开头的路径。其他题型可按需填写。"],
+    ["图片地址", "实操题无需填写。其他题型如需配图，可填写浏览器能直接访问的http(s)图片链接，或网站public目录下以/开头的路径。"],
     ["导入提示", "示例行请修改或删除后再正式导入。系统会逐行校验并提示问题所在行。"]
   ];
   const buildSheetXml = (sheetTable, widths, filter) => {
