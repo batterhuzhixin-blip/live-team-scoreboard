@@ -357,6 +357,8 @@ main { flex: 1; }
 .user-action { min-height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--white); color: var(--ink); cursor: pointer; font-size: 10px; font-weight: 800; }
 .user-action:hover { border-color: var(--ink); }
 .user-action:disabled { opacity: .55; cursor: wait; }
+.reset-password-user { border-color: rgba(17,116,96,.26); color: var(--green); }
+.reset-password-user:hover { border-color: var(--green); background: var(--green-soft); }
 .delete-user { border-color: rgba(194,70,54,.24); color: var(--red); }
 .delete-user:hover { border-color: var(--red); background: var(--red-soft); }
 
