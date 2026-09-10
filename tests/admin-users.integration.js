@@ -38,7 +38,7 @@ fs.writeFileSync(path.join(dataDir, "quiz-state.json"), JSON.stringify({
     tier: 2,
     type: "practical",
     prompt: "实操题A",
-    imageUrl: "/og.png",
+    imageUrl: "",
     options: [],
     correctAnswer: "",
     explanation: "线下评分",
@@ -214,6 +214,7 @@ async function waitForServer() {
     const templateText = `${strFromU8(templateFiles["xl/worksheets/sheet1.xml"])}\n${strFromU8(templateFiles["xl/worksheets/sheet2.xml"])}`;
     assert.match(templateText, /实操题/);
     assert.doesNotMatch(templateText, /看图纠错/);
+    assert.doesNotMatch(templateText, /\/og\.png/);
     const importedTemplate = (await request("/api/admin/import", {
       method: "POST",
       body: JSON.stringify({ filename: "题库导入模板.xlsx", data: Buffer.from(templateBytes).toString("base64"), mode: "append" })
