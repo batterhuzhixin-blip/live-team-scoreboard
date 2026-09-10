@@ -225,7 +225,19 @@ async function waitForServer() {
     const removedTeam = (await request(`/api/admin/teams/${encodeURIComponent(unclaimedTeam.id)}`, { method: "DELETE" }, adminCookie)).body;
     assert.match(removedTeam.message, /乘风破浪队/);
 
-    console.log("队伍导入、唯一引用、A/B路线权限、用户重置删除及会话失效测试通过");
+    const unauthorizedClear = await fetch(`${origin}/api/admin/questions`, { method: "DELETE" });
+    assert.strictEqual(unauthorizedClear.status, 401);
+    const beforeClear = (await request("/api/admin/status", {}, adminCookie)).body;
+    assert.ok(beforeClear.stats.questions > 0);
+    const cleared = (await request("/api/admin/questions", { method: "DELETE" }, adminCookie)).body;
+    assert.strictEqual(cleared.removedQuestions, beforeClear.stats.questions);
+    assert.strictEqual(cleared.total, 0);
+    const afterClear = (await request("/api/admin/status", {}, adminCookie)).body;
+    assert.strictEqual(afterClear.stats.questions, 0);
+    assert.strictEqual(afterClear.stats.attempts, beforeClear.stats.attempts);
+    assert.strictEqual(afterClear.stats.users, beforeClear.stats.users);
+
+    console.log("队伍导入、唯一引用、A/B路线权限、用户重置删除、题库清空及会话失效测试通过");
   } finally {
     server.kill();
     await new Promise((resolve) => server.once("exit", resolve));
