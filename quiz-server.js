@@ -891,6 +891,18 @@ async function handleApi(req, res, url) {
     });
     return res.end(file);
   }
+  if (req.method === "DELETE" && url.pathname === "/api/admin/questions") {
+    if (!requireAdmin(req, res)) return;
+    const removedQuestions = state.questions.length;
+    state.questions = [];
+    if (removedQuestions) saveState();
+    return json(res, 200, {
+      message: removedQuestions ? `已清空题库，共删除${removedQuestions}道题` : "当前题库已经是空的",
+      removedQuestions,
+      total: 0,
+      tiers: questionCounts()
+    });
+  }
   if (req.method === "POST" && url.pathname === "/api/admin/import") {
     if (!requireAdmin(req, res)) return;
     const body = await readJson(req);
