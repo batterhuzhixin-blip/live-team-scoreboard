@@ -113,6 +113,7 @@ main { flex: 1; }
 .field select { appearance: auto; }
 .field textarea { min-height: 156px; padding-top: 13px; padding-bottom: 13px; resize: vertical; line-height: 1.65; }
 .field input::placeholder { color: #a5a49e; }
+.field input[readonly] { background: var(--paper); color: var(--ink); cursor: default; }
 .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--green); box-shadow: 0 0 0 4px rgba(47,122,98,.10); }
 .field select:disabled { background: #ece9e1; color: var(--muted); }
 .field-help { margin-top: -2px; color: var(--muted); font-size: 10px; line-height: 1.55; }
