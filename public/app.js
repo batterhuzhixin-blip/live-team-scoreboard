@@ -208,7 +208,7 @@ function teamCard(team) {
             : '<button type="button" class="primary-btn" data-action="finish-team">完赛</button>'
         }
         ${team.source === "quiz"
-          ? '<button type="button" class="ghost-btn" data-action="edit-team">编辑序号</button>'
+          ? ""
           : '<button type="button" class="ghost-btn" data-action="edit-team">编辑</button><button type="button" class="danger-ghost-btn" data-action="delete-team">删除</button>'}
       </div>
     </div>
@@ -346,17 +346,6 @@ async function addScore(teamId, points) {
 }
 
 async function editTeam(team) {
-  if (team.source === "quiz") {
-    const order = window.prompt("队伍序号（留空表示不设置）", team.order ?? "");
-    if (order === null) return;
-    await api(`/api/teams/${team.id}`, {
-      method: "PATCH",
-      body: { order }
-    });
-    toast("队伍序号已更新");
-    return;
-  }
-
   const name = window.prompt("队伍名称", team.name);
   if (name === null) return;
   const order = window.prompt("序号", team.order ?? "");
@@ -528,3 +517,4 @@ function escapeHtml(value) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
+
