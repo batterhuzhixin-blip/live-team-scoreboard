@@ -136,7 +136,7 @@ function renderUsers(users) {
   $("#userList").innerHTML = `<div class="user-list-head" aria-hidden="true">
     <span>队伍 / 账号</span><span>注册与最近作答</span><span>答题统计</span><span>得分</span><span>操作</span>
   </div>${users.map((user) => `<article class="user-row">
-    <div class="user-identity"><strong>${escapeHtml(user.teamName)}</strong><small>@${escapeHtml(user.username)} · ${escapeHtml(user.routeLabel || `${user.route || "A"}路线`)}</small></div>
+    <div class="user-identity"><strong>${escapeHtml(user.teamName)}</strong><small>@${escapeHtml(user.username)} · ${escapeHtml(user.routeLabel || `${user.route || "A"}路线`)} · ${user.order ? `${escapeHtml(user.order)}号` : "未设序号"}</small></div>
     <div class="user-time"><span>注册 ${formatDateTime(user.createdAt)}</span><small>${user.lastAnsweredAt ? `最近 ${formatDateTime(user.lastAnsweredAt)}` : "尚未答题"}</small></div>
     <div class="user-results"><span>已答 <b>${user.answered}</b></span><small class="correct-text">对 ${user.correct}</small><small class="wrong-text">错 ${user.wrong}</small></div>
     <strong class="user-score">${user.score}<small>分</small></strong>
