@@ -129,7 +129,9 @@ function normalizeSyncedTeam(team) {
   const name = String(team?.name || "").trim();
   const route = normalizeScoreRoute(team?.route);
   if (!quizTeamId || !name || !route) return null;
-  return { quizTeamId, name, route, registeredAt: normalizeDate(team.registeredAt) };
+  const rawOrder = toNullableNumber(team?.order ?? team?.drawOrder);
+  const order = Number.isInteger(rawOrder) && rawOrder >= 1 && rawOrder <= 999 ? rawOrder : null;
+  return { quizTeamId, name, route, order, registeredAt: normalizeDate(team.registeredAt) };
 }
 
 async function syncQuizTeams() {
@@ -154,9 +156,11 @@ async function syncQuizTeams() {
       }
 
       if (team) {
-        if (team.name !== item.name || team.route !== item.route || team.quizTeamId !== item.quizTeamId || team.source !== "quiz") {
+        const orderChanged = item.order !== null && team.order !== item.order;
+        if (team.name !== item.name || team.route !== item.route || orderChanged || team.quizTeamId !== item.quizTeamId || team.source !== "quiz") {
           team.name = item.name;
           team.route = item.route;
+          if (item.order !== null) team.order = item.order;
           team.quizTeamId = item.quizTeamId;
           team.source = "quiz";
           team.updatedAt = new Date().toISOString();
@@ -171,6 +175,7 @@ async function syncQuizTeams() {
         source: "quiz",
         name: item.name,
         route: item.route,
+        order: item.order,
         scoreEvents: [],
         createdAt: item.registeredAt || new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -667,8 +672,8 @@ async function handleApi(req, res, url) {
     const team = findTeam(teamMatch[1]);
     if (!team) return sendError(res, 404, "未找到队伍");
     if (!requireScoreAccess(req, res, team.route)) return;
-    if (team.source === "quiz" && ["name", "route", "color"].some((field) => body[field] !== undefined)) {
-      return sendError(res, 400, "题库同步队伍只能编辑序号，名称和路线请在题库系统中维护");
+    if (team.source === "quiz" && ["name", "route", "order", "color"].some((field) => body[field] !== undefined)) {
+      return sendError(res, 400, "题库同步队伍的名称、路线和序号均由注册信息维护");
     }
 
     commit((draft) => {
@@ -861,3 +866,4 @@ function getLanUrls() {
   }
   return urls;
 }
+
