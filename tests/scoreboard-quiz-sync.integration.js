@@ -11,8 +11,8 @@ const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "scoreboard-quiz-sync-"));
 const quizPort = 33000 + crypto.randomInt(500);
 const scorePort = 33500 + crypto.randomInt(500);
 const quizTeams = [
-  { id: "t_alpha", name: "财智先锋队", route: "A", registeredAt: new Date().toISOString() },
-  { id: "t_beta", name: "乘风破浪队", route: "B", registeredAt: new Date().toISOString() }
+  { id: "t_alpha", name: "财智先锋队", route: "A", order: 1, registeredAt: new Date().toISOString() },
+  { id: "t_beta", name: "乘风破浪队", route: "B", order: 2, registeredAt: new Date().toISOString() }
 ];
 
 const quizServer = http.createServer((req, res) => {
@@ -97,6 +97,8 @@ async function waitFor(predicate, message) {
     assert.ok(routeBTeam);
     assert.strictEqual(routeATeam.route, "A");
     assert.strictEqual(routeBTeam.route, "B");
+    assert.strictEqual(routeATeam.order, 1);
+    assert.strictEqual(routeBTeam.order, 2);
     assert.strictEqual(routeATeam.source, "quiz");
 
     const protectedPage = await fetch(`http://127.0.0.1:${scorePort}/score-a.html`, { redirect: "manual" });
@@ -164,13 +166,12 @@ async function waitFor(predicate, message) {
     });
     assert.strictEqual(renameSynced.status, 400);
 
-    await request(`/api/teams/${encodeURIComponent(routeATeam.id)}`, {
+    const editSyncedOrder = await fetch(`http://127.0.0.1:${scorePort}/api/teams/${encodeURIComponent(routeATeam.id)}`, {
       method: "PATCH",
-      body: JSON.stringify({ order: 7 }),
-      scoreRoute: "A"
+      headers: { "Content-Type": "application/json", Cookie: scoreCookies.A },
+      body: JSON.stringify({ order: 7 })
     });
-    const orderedState = await waitFor((state) => state.teams.find((team) => team.id === routeATeam.id)?.order === 7, "同步队伍序号未更新");
-    assert.strictEqual(orderedState.teams.find((team) => team.id === routeATeam.id).name, "财智先锋队");
+    assert.strictEqual(editSyncedOrder.status, 400);
 
     const deleteSynced = await fetch(`http://127.0.0.1:${scorePort}/api/teams/${encodeURIComponent(routeATeam.id)}`, {
       method: "DELETE",
@@ -221,10 +222,10 @@ async function waitFor(predicate, message) {
     assert.strictEqual(scoredBTeam.questionCounts[2], 1);
     assert.strictEqual(scoredBTeam.questionCounts[3], 1);
 
-    quizTeams[0] = { ...quizTeams[0], name: "财智先锋一队", route: "B" };
+    quizTeams[0] = { ...quizTeams[0], name: "财智先锋一队", route: "B", order: 7 };
     const updatedState = await waitFor((state) => {
       const team = state.teams.find((item) => item.quizTeamId === "t_alpha");
-      return team && team.name === "财智先锋一队" && team.route === "B";
+      return team && team.name === "财智先锋一队" && team.route === "B" && team.order === 7;
     }, "题库队伍更新未同步到计分系统");
     const updatedTeam = updatedState.teams.find((team) => team.quizTeamId === "t_alpha");
     assert.strictEqual(updatedTeam.id, routeATeam.id);
@@ -278,3 +279,4 @@ async function waitFor(predicate, message) {
   console.error(error);
   process.exitCode = 1;
 });
+
