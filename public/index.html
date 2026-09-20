@@ -16,7 +16,7 @@
     <meta name="twitter:image" content="__SITE_ORIGIN__/og.png" />
     <title>财趣答题赛</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/quiz.css?v=20260910-2" />
+    <link rel="stylesheet" href="/quiz.css?v=20260920-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -57,7 +57,7 @@
               </div>
               <label class="field">
                 <span>登录账号</span>
-                <input name="username" autocomplete="username" required maxlength="24" placeholder="请输入账号" />
+                <input name="username" autocomplete="username" required maxlength="30" placeholder="请输入队伍名称" />
               </label>
               <label class="field">
                 <span>登录密码</span>
@@ -90,11 +90,17 @@
                     <span><strong>B路线</strong><small>可使用 2档、3档答题包</small></span>
                   </label>
                 </div>
-                <small class="field-help">路线在注册后固定，如需更换请联系管理员删除账号后重新注册。</small>
+                <small class="field-help">路线和比赛序号在注册后固定，如需更换请联系管理员删除账号后重新注册。</small>
               </fieldset>
               <label class="field">
+                <span>比赛序号</span>
+                <input name="order" type="number" inputmode="numeric" required min="1" max="999" step="1" placeholder="请输入抽签序号" />
+                <small class="field-help">同一路线的比赛序号不能重复。</small>
+              </label>
+              <label class="field">
                 <span>登录账号</span>
-                <input name="username" autocomplete="username" required minlength="3" maxlength="24" placeholder="3–24位字符" />
+                <input id="registerUsername" name="username" autocomplete="username" required maxlength="30" readonly placeholder="选择队伍后自动生成" />
+                <small class="field-help">登录账号与所选队伍名称一致，无需手动填写。</small>
               </label>
               <label class="field">
                 <span>设置密码</span>
@@ -193,7 +199,7 @@
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="/quiz.js?v=20260910-2"></script>
+    <script src="/quiz.js?v=20260920-1"></script>
   </body>
 </html>
 
