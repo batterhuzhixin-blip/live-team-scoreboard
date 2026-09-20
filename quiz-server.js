@@ -81,6 +81,12 @@ function teamIdForName(name) {
   return `t_${crypto.createHash("sha256").update(cleanText(name).toLocaleLowerCase("zh-CN")).digest("hex").slice(0, 16)}`;
 }
 
+function normalizeCompetitionOrder(value) {
+  if (value === "" || value === null || value === undefined) return null;
+  const order = Number(value);
+  return Number.isInteger(order) && order >= 1 && order <= 999 ? order : null;
+}
+
 function normalizeLoadedState(parsed) {
   const users = Array.isArray(parsed.users) ? parsed.users : [];
   const questions = Array.isArray(parsed.questions) ? parsed.questions : seedQuestions;
@@ -127,6 +133,7 @@ function normalizeLoadedState(parsed) {
     }
     user.route = normalizeRoute(user.route)
       || (attempts.some((attempt) => attempt.userId === user.id && Number(attempt.tier) === 3) ? "B" : "A");
+    user.order = normalizeCompetitionOrder(user.order ?? user.drawOrder);
   });
 
   return {
@@ -335,7 +342,7 @@ function verifyPassword(password, user) {
 
 function publicUser(user) {
   const route = normalizeRoute(user.route) || "A";
-  return { id: user.id, username: user.username, teamName: user.teamName, route, routeLabel: routeLabel(route), createdAt: user.createdAt };
+  return { id: user.id, username: user.username, teamName: user.teamName, route, routeLabel: routeLabel(route), order: normalizeCompetitionOrder(user.order), createdAt: user.createdAt };
 }
 
 function publicAvailableTeams() {
@@ -352,9 +359,10 @@ function scoreboardTeams() {
       id: user.teamId || user.id,
       name: user.teamName,
       route: normalizeRoute(user.route) || "A",
+      order: normalizeCompetitionOrder(user.order),
       registeredAt: user.createdAt
     }))
-    .sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
+    .sort((a, b) => a.route.localeCompare(b.route) || (a.order ?? Number.POSITIVE_INFINITY) - (b.order ?? Number.POSITIVE_INFINITY) || a.name.localeCompare(b.name, "zh-CN"));
 }
 
 function adminTeams() {
@@ -641,21 +649,26 @@ async function handleApi(req, res, url) {
     const body = await readJson(req);
     const teamId = cleanText(body.teamId);
     const route = normalizeRoute(body.route);
-    const username = cleanText(body.username);
+    const order = normalizeCompetitionOrder(body.order);
     const password = String(body.password || "");
     const team = state.teams.find((item) => item.id === teamId);
     if (!team) return json(res, 400, { error: "请选择管理员预先录入的队伍" });
     if (team.claimedByUserId) return json(res, 409, { error: "该队伍已被其他账号引用，请选择自己的队伍" });
     if (!route) return json(res, 400, { error: "请选择A路线或B路线" });
-    if (!/^[\p{L}\p{N}_.-]{3,24}$/u.test(username)) return json(res, 400, { error: "账号需为3至24位中文、字母、数字或 _ . -" });
+    if (!order) return json(res, 400, { error: "比赛序号需为1至999的整数" });
     if (password.length < 6 || password.length > 72) return json(res, 400, { error: "密码需为6至72个字符" });
+    const username = team.name;
     if (state.users.some((user) => user.username.toLowerCase() === username.toLowerCase())) return json(res, 409, { error: "该账号已被注册" });
+    if (state.users.some((user) => normalizeRoute(user.route) === route && normalizeCompetitionOrder(user.order) === order)) {
+      return json(res, 409, { error: `${routeLabel(route)}的${order}号已被其他队伍使用，请核对抽签序号` });
+    }
     const passwordData = hashPassword(password);
     const user = {
       id: `u_${crypto.randomUUID()}`,
       teamId: team.id,
       teamName: team.name,
       route,
+      order,
       username,
       passwordHash: passwordData.hash,
       passwordSalt: passwordData.salt,
