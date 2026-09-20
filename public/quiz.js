@@ -64,6 +64,8 @@ async function loadAvailableTeams() {
 function updateTeamAvailability() {
   const select = $("#teamSelect");
   const helper = $("#teamAvailability");
+  const selectedTeam = state.availableTeams.find((team) => team.id === select.value);
+  $("#registerUsername").value = selectedTeam ? selectedTeam.name : "";
   if (!state.availableTeams.length) {
     helper.textContent = "当前没有可引用的队伍，请联系管理员提前录入。";
     return;
@@ -139,7 +141,7 @@ async function refreshDashboard() {
 function renderDashboard() {
   const data = state.dashboard;
   $("#welcomeTeam").textContent = data.user.teamName;
-  $("#teamPill").textContent = `${data.user.teamName} · ${data.user.routeLabel}`;
+  $("#teamPill").textContent = `${data.user.teamName} · ${data.user.routeLabel}${data.user.order ? ` · ${data.user.order}号` : ""}`;
   $("#routeHint").textContent = `${data.user.routeLabel}：可使用${data.user.route === "B" ? "2档和3档" : "1档和2档"}答题包，每道题只有一次回答机会。`;
   $("#heroScore").textContent = data.summary.score;
   $("#statAnswered").textContent = data.summary.answered;
