@@ -142,10 +142,12 @@ async function waitForServer() {
 
     const registered = await request("/api/auth/register", {
       method: "POST",
-      body: JSON.stringify({ teamId: selectedTeam.id, route: "A", username: "finance_team", password: "test123456" })
+      body: JSON.stringify({ teamId: selectedTeam.id, route: "A", order: 3, password: "test123456" })
     });
     assert.strictEqual(registered.body.user.teamName, "财智先锋队");
+    assert.strictEqual(registered.body.user.username, "财智先锋队");
     assert.strictEqual(registered.body.user.route, "A");
+    assert.strictEqual(registered.body.user.order, 3);
 
     const routeADashboard = (await request("/api/quiz/dashboard", {}, registered.cookie)).body;
     assert.deepStrictEqual(routeADashboard.tiers.map((item) => item.tier), [1, 2]);
@@ -189,12 +191,12 @@ async function waitForServer() {
     const oldPasswordLogin = await fetch(`${origin}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: "finance_team", password: "test123456" })
+      body: JSON.stringify({ username: "财智先锋队", password: "test123456" })
     });
     assert.strictEqual(oldPasswordLogin.status, 401);
     const newPasswordLogin = await request("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify({ username: "finance_team", password: "123456" })
+      body: JSON.stringify({ username: "财智先锋队", password: "123456" })
     });
     assert.strictEqual(newPasswordLogin.body.user.route, "A");
     const afterPasswordReset = (await request("/api/admin/status", {}, adminCookie)).body.users.find((user) => user.id === registered.body.user.id);
@@ -206,30 +208,54 @@ async function waitForServer() {
     const duplicateResponse = await fetch(`${origin}/api/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ teamId: selectedTeam.id, route: "B", username: "another_team", password: "test123456" })
+      body: JSON.stringify({ teamId: selectedTeam.id, route: "B", order: 4, password: "test123456" })
     });
     assert.strictEqual(duplicateResponse.status, 409);
     const availableAfterClaim = (await request("/api/teams/available")).body.teams;
     assert.strictEqual(availableAfterClaim.some((team) => team.id === selectedTeam.id), false);
 
+    const duplicateOrderTeam = availableAfterClaim.find((team) => team.name === "乘风破浪队");
+    const duplicateOrder = await fetch(`${origin}/api/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ teamId: duplicateOrderTeam.id, route: "A", order: 3, password: "test123456" })
+    });
+    assert.strictEqual(duplicateOrder.status, 409);
+
     const bTeam = availableAfterClaim.find((team) => team.name === "测试队伍");
     const missingRoute = await fetch(`${origin}/api/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ teamId: bTeam.id, username: "missing_route", password: "test123456" })
+      body: JSON.stringify({ teamId: bTeam.id, order: 3, password: "test123456" })
     });
     assert.strictEqual(missingRoute.status, 400);
+    const missingOrder = await fetch(`${origin}/api/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ teamId: bTeam.id, route: "B", password: "test123456" })
+    });
+    assert.strictEqual(missingOrder.status, 400);
     const routeBRegistered = await request("/api/auth/register", {
       method: "POST",
-      body: JSON.stringify({ teamId: bTeam.id, route: "B", username: "route_b_team", password: "test123456" })
+      body: JSON.stringify({ teamId: bTeam.id, route: "B", order: 3, password: "test123456" })
     });
     assert.strictEqual(routeBRegistered.body.user.route, "B");
+    assert.strictEqual(routeBRegistered.body.user.order, 3);
     const routeBDashboard = (await request("/api/quiz/dashboard", {}, routeBRegistered.cookie)).body;
     assert.deepStrictEqual(routeBDashboard.tiers.map((item) => item.tier), [2, 3]);
     const routeBForbidden = await fetch(`${origin}/api/quiz/next?tier=1`, { headers: { Cookie: routeBRegistered.cookie } });
     assert.strictEqual(routeBForbidden.status, 403);
     const routeBAllowed = await fetch(`${origin}/api/quiz/next?tier=3`, { headers: { Cookie: routeBRegistered.cookie } });
     assert.strictEqual(routeBAllowed.status, 200);
+
+    const scoreboardTeams = (await request("/api/integrations/scoreboard/teams")).body.teams;
+    assert.deepStrictEqual(
+      scoreboardTeams.map((team) => ({ name: team.name, route: team.route, order: team.order })),
+      [
+        { name: "财智先锋队", route: "A", order: 3 },
+        { name: "测试队伍", route: "B", order: 3 }
+      ]
+    );
 
     const templateResponse = await fetch(`${origin}/api/admin/template`, { headers: { Cookie: adminCookie } });
     assert.strictEqual(templateResponse.status, 200);
